@@ -26,11 +26,13 @@ namespace Administration
         string folderName;
         string folderPath;
         string package;
+        string[] banned = new string[] {"cache", "cookies", "temp", "tmp"};
 
         public Form1()
         {
             String tmp = Directory.GetCurrentDirectory();
             folderName = tmp + "\\Packages";
+            //folderName = "D:\\Bakalar\\Packages";
             if (!Directory.Exists(folderName)) System.IO.Directory.CreateDirectory(folderName);
             InitializeComponent();
         }
@@ -91,14 +93,18 @@ namespace Administration
         private void OnChanged(object source, FileSystemEventArgs e)
         {
             // Specify what is done when a file is changed, created, or deleted.
-
-            string[] words = e.FullPath.Split('\\');
             writeToKonzole("File: " + e.FullPath + " " + e.ChangeType + Environment.NewLine);
+            string[] words = e.FullPath.Split('\\');
             if (e.ChangeType == System.IO.WatcherChangeTypes.Created)
             {
+                bool clean = true;
+                foreach (string s in banned)
+                {
+                    if (e.FullPath.ToLower().Contains(s)) clean = false;
+                }
                 try
                 {
-                    if (!words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg") && File.Exists(e.FullPath)) file.WriteLine(e.FullPath);
+                    if (clean && !words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg") && File.Exists(e.FullPath)) file.WriteLine(e.FullPath);
                 }
                 catch (IOException)
                 {
@@ -110,13 +116,20 @@ namespace Administration
                 if (File.Exists(e.FullPath))
                 {
                     bool nasiel = false;
+                    bool clean = true;
+                    file.Close();
                     string[] readText = File.ReadAllLines(folderPath + "\\" + package + ".txt");
+                    file = new System.IO.StreamWriter(folderPath + "\\" + package + ".txt", true);
                     foreach (string s in readText) {
                         if (s.Equals(e.FullPath)) nasiel = true;
                     }
+                    foreach (string s in banned)
+                    {
+                        if (e.FullPath.ToLower().Contains(s)) clean = false;
+                    }
                     try
                     {
-                        if (!words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg") && !nasiel) file.WriteLine(e.FullPath);
+                        if (clean && !nasiel && !words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg")) file.WriteLine(e.FullPath);
                     }
                     catch (IOException)
                     {
@@ -128,6 +141,7 @@ namespace Administration
 
         private void copyTrackedFiles()
         {
+            if (!Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\Packages")) Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\Packages");
             string[] lines = System.IO.File.ReadAllLines(folderPath + "\\" + package + ".txt");
             foreach (string line in lines)
             {
@@ -137,7 +151,31 @@ namespace Administration
                     {
                         Directory.CreateDirectory(Path.GetDirectoryName(System.IO.Path.Combine(folderPath, newPath)));
                     }
-                    System.IO.File.Copy(line, System.IO.Path.Combine(folderPath, newPath), true);
+                    if (File.Exists(line))
+                    {
+                        if (line.Contains(".exe"))
+                        {                            
+                            string[] words = line.Split('\\');
+                            Form2 dialog = new Form2();
+                            dialog.StartPosition = FormStartPosition.CenterParent;
+                            dialog.nazov(words[words.Length-1]);
+                            if (dialog.ShowDialog(this) == DialogResult.OK)
+                            {
+                                writeToKonzole(dialog.shortcut() + Environment.NewLine);
+                                var wsh = new IWshRuntimeLibrary.IWshShell_Class();
+                                IWshRuntimeLibrary.IWshShortcut shortcut = wsh.CreateShortcut(
+                                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\Packages\\" + dialog.shortcut() + ".lnk") as IWshRuntimeLibrary.IWshShortcut;
+                                shortcut.Arguments = package + " \"" + line + "\"";
+                                shortcut.TargetPath = @"D:\\Bakalar\\UserApp\\UserApp\\bin\\Debug\\UserApp.exe";
+                                shortcut.Save();
+                            }
+                            else
+                            {
+                                writeToKonzole("Cancelled" + Environment.NewLine);
+                            }
+                        }
+                        System.IO.File.Copy(line, System.IO.Path.Combine(folderPath, newPath), true);
+                    }
                 }
             }
         }
@@ -222,6 +260,7 @@ namespace Administration
                         break;
                 }
             }
+            if (j == 1) return null;
             return res;
         }
 
@@ -246,7 +285,8 @@ namespace Administration
                 DiffEngine de = new DiffEngine();
                 time = de.ProcessDiff(sLF, dLF, DiffEngineLevel.FastImperfect);
                 ArrayList rep = de.DiffReport();
-                File.WriteAllLines(folderPath + "\\" + package + ".reg", getResults(dLF, rep));
+                string[] res = getResults(dLF, rep);
+                if (res != null) File.WriteAllLines(folderPath + "\\" + package + ".reg", res);
             }
             catch (Exception ex)
             {
@@ -267,7 +307,6 @@ namespace Administration
         private void button1_Click(object sender, EventArgs e)
         {
             button1.Enabled = false;
-            button3.Enabled = false;
             startFileWatchers();
             file = new System.IO.StreamWriter(folderPath + "\\" + package + ".txt", true);
             ExportKey("HKEY_CURRENT_USER\\SOFTWARE", folderPath + "\\before.reg");
@@ -291,61 +330,11 @@ namespace Administration
             File.Delete(folderPath + "\\after.reg");
             File.Delete(folderPath + "\\before.reg");
             button1.Enabled = true;
-            getPackages();
             writeToKonzole(package + " zaznamenany" + Environment.NewLine);
-        }
-
-        private void button3_Click(object sender, EventArgs e)
-        {
-            button1.Enabled = false;
-            button3.Enabled = false;
-            package = (string)comboBox1.SelectedItem;
-            folderPath = System.IO.Path.Combine(folderName, package);
-            if (System.IO.File.Exists(System.IO.Path.Combine(folderPath, package + ".txt")))
-            {
-                string[] lines = System.IO.File.ReadAllLines(System.IO.Path.Combine(folderPath, package + ".txt"));
-                foreach (string line in lines)
-                {
-                    string newPath = line.Substring(3);
-                    if (File.Exists(System.IO.Path.Combine(folderPath, newPath))) { 
-                        if (!Directory.Exists(Path.GetDirectoryName(line)))
-                        {
-                            Directory.CreateDirectory(Path.GetDirectoryName(line));
-                        }
-                        System.IO.File.Copy(System.IO.Path.Combine(folderPath, newPath), line, true);
-                    }
-                }
-                ImportKey(System.IO.Path.Combine(folderPath, package + ".reg"));
-                writeToKonzole(package + " nainstalovany" + Environment.NewLine);
-            }
-            else
-            {
-                writeToKonzole("Nenasiel som instalaciu pre " + package + Environment.NewLine);
-            }
-            button1.Enabled = true;
-            button3.Enabled = true;
-        }
-
-        private void getPackages()
-        {
-            comboBox1.Items.Clear();
-            string[] words;
-            string[] subdirectoryEntries = Directory.GetDirectories(folderName);
-            foreach (string subdirectory in subdirectoryEntries)
-            {
-                words = subdirectory.Split('\\');
-                comboBox1.Items.Add(words[words.Length - 1]);
-            }
-            if (comboBox1.Items.Count > 0)
-            {
-                comboBox1.SelectedIndex = 0;
-                button3.Enabled = true;
-            }
         }
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            getPackages();
         }
     }
 }
