@@ -26,7 +26,7 @@ namespace Administration
         string folderName;
         string folderPath;
         string package;
-        string[] banned = new string[] {"cache", "cookies", "temp", "tmp"};
+        string[] banned = new string[] {"cache", "cookies", "temp", "tmp", "appdata"};
 
         public Form1()
         {
@@ -93,7 +93,6 @@ namespace Administration
         private void OnChanged(object source, FileSystemEventArgs e)
         {
             // Specify what is done when a file is changed, created, or deleted.
-            writeToKonzole("File: " + e.FullPath + " " + e.ChangeType + Environment.NewLine);
             string[] words = e.FullPath.Split('\\');
             if (e.ChangeType == System.IO.WatcherChangeTypes.Created)
             {
@@ -104,7 +103,11 @@ namespace Administration
                 }
                 try
                 {
-                    if (clean && !words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg") && File.Exists(e.FullPath)) file.WriteLine(e.FullPath);
+                    if (clean && !words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg") && File.Exists(e.FullPath))
+                    {
+                        writeToKonzole("File: " + e.FullPath + " " + e.ChangeType + Environment.NewLine);
+                        file.WriteLine(e.FullPath);
+                    }
                 }
                 catch (IOException)
                 {
@@ -129,7 +132,11 @@ namespace Administration
                     }
                     try
                     {
-                        if (clean && !nasiel && !words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg")) file.WriteLine(e.FullPath);
+                        if (clean && !nasiel && !words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg"))
+                        {
+                            writeToKonzole("File: " + e.FullPath + " " + e.ChangeType + Environment.NewLine);
+                            file.WriteLine(e.FullPath);
+                        }
                     }
                     catch (IOException)
                     {
@@ -183,21 +190,28 @@ namespace Administration
         private void OnRenamed(object source, RenamedEventArgs e)
         {
             // Specify what is done when a file is renamed.
+            bool clean = true;
             writeToKonzole("File: " + e.OldFullPath + " renamed to " + e.FullPath + Environment.NewLine);
             if (File.Exists(e.FullPath))
             {
-                file.Close();
-                string[] readText = File.ReadAllLines(folderPath + "\\" + package + ".txt");
-                for (int i = 0; i < readText.Length; i++)
+                foreach (string s in banned)
                 {
-                    if (readText[i].Equals(e.OldFullPath))
-                    {
-                        readText[i] = e.FullPath;
-                    }
-                    writeToKonzole(readText[i] + Environment.NewLine);
+                    if (e.FullPath.ToLower().Contains(s)) clean = false;
                 }
-                File.WriteAllLines(folderPath + "\\" + package + ".txt", readText);    
-                file = new System.IO.StreamWriter(folderPath + "\\" + package + ".txt", true);
+                if (clean) { 
+                    file.Close();
+                    string[] readText = File.ReadAllLines(folderPath + "\\" + package + ".txt");
+                    for (int i = 0; i < readText.Length; i++)
+                    {
+                        if (readText[i].Equals(e.OldFullPath))
+                        {
+                            readText[i] = e.FullPath;
+                        }
+                        writeToKonzole(readText[i] + Environment.NewLine);
+                    }
+                    File.WriteAllLines(folderPath + "\\" + package + ".txt", readText);    
+                    file = new System.IO.StreamWriter(folderPath + "\\" + package + ".txt", true);
+                }
             }
         }
 
