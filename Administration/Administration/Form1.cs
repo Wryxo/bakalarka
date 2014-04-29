@@ -10,7 +10,11 @@ using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Management;
+using System.Net;
+using System.Net.Http;
+using System.Net.Security;
 using System.Reflection;
+using System.Security.Cryptography.X509Certificates;
 using System.Security.Permissions;
 using System.Text;
 using System.Threading.Tasks;
@@ -20,8 +24,7 @@ namespace Administration
 {
     public partial class Form1 : Form
     {
-        FileSystemWatcher watcher;
-        FileSystemWatcher watcher2;
+        List<FileSystemWatcher> watchers = new List<FileSystemWatcher>();
         System.IO.StreamWriter file;
         string folderName;
         string folderPath;
@@ -43,49 +46,31 @@ namespace Administration
             package = textBox3.Text;
             folderPath = System.IO.Path.Combine(folderName, package);
             System.IO.Directory.CreateDirectory(folderPath);
-            if (checkBox1.Checked)
+
+            DriveInfo[] allDrives = DriveInfo.GetDrives();
+            foreach (DriveInfo d in allDrives)
             {
-                // Create a new FileSystemWatcher and set its properties.
-                watcher = new FileSystemWatcher();
-                watcher.Path = "C:\\";
-                /* Watch for changes in LastAccess and LastWrite times, and
-                   the renaming of files or directories. */
-                watcher.NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite
-                   | NotifyFilters.FileName | NotifyFilters.DirectoryName;
-                // Only watch text files.
-                //watcher.Filter = "*.txt";
-                watcher.IncludeSubdirectories = true;
+                if (d.DriveType == DriveType.Fixed) 
+                { 
+                    FileSystemWatcher watcher = new FileSystemWatcher();
+                    // Create a new FileSystemWatcher and set its properties.
+                    watcher.Path = d.Name;
+                    watcher.IncludeSubdirectories = true;
+                    /* Watch for changes in LastAccess and LastWrite times, and
+                       the renaming of files or directories. */
+                    watcher.NotifyFilter = NotifyFilters.LastWrite
+                       | NotifyFilters.FileName | NotifyFilters.DirectoryName;
 
-                // Add event handlers.
-                watcher.Changed += new FileSystemEventHandler(OnChanged);
-                watcher.Created += new FileSystemEventHandler(OnChanged);
-                watcher.Deleted += new FileSystemEventHandler(OnChanged);
-                watcher.Renamed += new RenamedEventHandler(OnRenamed);
+                    // Add event handlers.
+                    watcher.Changed += new FileSystemEventHandler(OnChanged);
+                    watcher.Created += new FileSystemEventHandler(OnChanged);
+                    watcher.Deleted += new FileSystemEventHandler(OnChanged);
+                    watcher.Renamed += new RenamedEventHandler(OnRenamed);
 
-                // Begin watching.
-                watcher.EnableRaisingEvents = true; 
-            }
-
-            if (checkBox2.Checked)
-            {
-                watcher2 = new FileSystemWatcher();
-                watcher2.Path = "D:\\";
-                /* Watch for changes in LastAccess and LastWrite times, and
-                   the renaming of files or directories. */
-                watcher2.NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite
-                   | NotifyFilters.FileName | NotifyFilters.DirectoryName;
-                // Only watch text files.
-                //watcher2.Filter = "*.txt";
-                watcher2.IncludeSubdirectories = true;
-
-                // Add event handlers.
-                watcher2.Changed += new FileSystemEventHandler(OnChanged);
-                watcher2.Created += new FileSystemEventHandler(OnChanged);
-                watcher2.Deleted += new FileSystemEventHandler(OnChanged);
-                watcher2.Renamed += new RenamedEventHandler(OnRenamed);
-
-                // Begin watching.
-                watcher2.EnableRaisingEvents = true; 
+                    // Begin watching.
+                    watcher.EnableRaisingEvents = true;
+                    watchers.Add(watcher);
+                }
             }
         }
 
@@ -333,8 +318,9 @@ namespace Administration
         {
             file.Close();
             button2.Enabled = false;
-            if (watcher != null) watcher.EnableRaisingEvents = false;
-            if (watcher2 != null) watcher2.EnableRaisingEvents = false;
+            foreach (FileSystemWatcher watcher in watchers) {
+                watcher.EnableRaisingEvents = false;
+            }
             copyTrackedFiles();
             writeToKonzole("Subory odkopirovane" + Environment.NewLine);
             ExportKey("HKEY_CURRENT_USER\\SOFTWARE", folderPath + "\\after.reg");
@@ -347,8 +333,42 @@ namespace Administration
             writeToKonzole(package + " zaznamenany" + Environment.NewLine);
         }
 
-        private void Form1_Load(object sender, EventArgs e)
+        private void button3_Click(object sender, EventArgs e)
         {
+            FileStream tmp = new FileStream("D:\\upload.zip", FileMode.Open);
+            byte[] tmp2 = File.ReadAllBytes("D:\\upload.txt");
+            Stream aaa = Upload("https://localhost:44300/upload.cshtml", "asdf", tmp, tmp2);
+            byte[] buff = new byte[10000];
+            aaa.Read(buff, 0, 9000);
+            for (int i = 0; i < buff.Length; i++)
+            {
+                writeToKonzole(Convert.ToChar(buff[i]) + " ");
+            }
+        }
+
+        private System.IO.Stream Upload(string actionUrl, string paramString, Stream paramFileStream, byte[] paramFileBytes)
+        {
+            HttpContent stringContent = new StringContent(paramString);
+            HttpContent fileStreamContent = new StreamContent(paramFileStream);
+            HttpContent bytesContent = new ByteArrayContent(paramFileBytes);
+            using (var client = new HttpClient())
+            using (var formData = new MultipartFormDataContent())
+            {
+                ServicePointManager.ServerCertificateValidationCallback =
+                (object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors) =>
+                {
+                    return true;
+                };
+                formData.Add(stringContent, "param1", "param1");
+                formData.Add(fileStreamContent, "file1", "upload.zip");
+                formData.Add(bytesContent, "file2", "file2");
+                var response = client.PostAsync(actionUrl, formData).Result;
+                if (!response.IsSuccessStatusCode)
+                {
+                    return null;
+                }
+                return response.Content.ReadAsStreamAsync().Result;
+            }
         }
     }
 }
