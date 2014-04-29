@@ -87,48 +87,25 @@ namespace Administration
                 {
                     if (e.FullPath.ToLower().Contains(s)) clean = false;
                 }
-                try
+                if (clean && !words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg") && File.Exists(e.FullPath))
                 {
-                    if (clean && !words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg") && File.Exists(e.FullPath))
-                    {
-                        writeToKonzole("File: " + e.FullPath + " " + e.ChangeType + Environment.NewLine);
-                        changes.Add(e.FullPath, e.FullPath);
-                        //file.WriteLine(e.FullPath);
-                    }
+                    writeToKonzole("File: " + e.FullPath + " " + e.ChangeType + Environment.NewLine);
+                    changes.Add(e.FullPath, e.FullPath);
                 }
-                catch (IOException)
-                {
-
-                }
-            }
-            if (e.ChangeType == System.IO.WatcherChangeTypes.Changed)
+            } else if (e.ChangeType == System.IO.WatcherChangeTypes.Changed)
             {
                 if (File.Exists(e.FullPath))
                 {
                     bool nasiel = false;
                     bool clean = true;
-                    //file.Close();
-                    //string[] readText = File.ReadAllLines(folderPath + "\\" + package + ".txt");
-                    //file = new System.IO.StreamWriter(folderPath + "\\" + package + ".txt", true);
-                    /*foreach (string s in readText) {
-                        if (s.Equals(e.FullPath)) nasiel = true;
-                    }*/
                     foreach (string s in banned)
                     {
                         if (e.FullPath.ToLower().Contains(s)) clean = false;
                     }
-                    try
+                    if (clean && !nasiel && !words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg"))
                     {
-                        if (clean && !nasiel && !words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg"))
-                        {
-                            writeToKonzole("File: " + e.FullPath + " " + e.ChangeType + Environment.NewLine);
-                            if (!changes.Contains(e.FullPath)) changes.Add(e.FullPath, e.FullPath);
-                            //file.WriteLine(e.FullPath);
-                        }
-                    }
-                    catch (IOException)
-                    {
-
+                        writeToKonzole("File: " + e.FullPath + " " + e.ChangeType + Environment.NewLine);
+                        if (!changes.Contains(e.FullPath)) changes.Add(e.FullPath, e.FullPath);
                     }
                 }    
             }
@@ -137,9 +114,9 @@ namespace Administration
         private void copyTrackedFiles()
         {
             if (!Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\Packages")) Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\Packages");
-            string[] lines = System.IO.File.ReadAllLines(folderPath + "\\" + package + ".txt");
-            foreach (string line in lines)
+            foreach (DictionaryEntry de in changes)
             {
+                string line = (string)de.Value;
                 string newPath = line.Substring(3);
                 if (File.Exists(line)) { 
                     if (!Directory.Exists(Path.GetDirectoryName(System.IO.Path.Combine(folderPath, newPath))))
@@ -179,26 +156,16 @@ namespace Administration
         {
             // Specify what is done when a file is renamed.
             bool clean = true;
-            writeToKonzole("File: " + e.OldFullPath + " renamed to " + e.FullPath + Environment.NewLine);
             if (File.Exists(e.FullPath))
             {
                 foreach (string s in banned)
                 {
                     if (e.FullPath.ToLower().Contains(s)) clean = false;
                 }
-                if (clean) { 
-                    file.Close();
-                    string[] readText = File.ReadAllLines(folderPath + "\\" + package + ".txt");
-                    for (int i = 0; i < readText.Length; i++)
-                    {
-                        if (readText[i].Equals(e.OldFullPath))
-                        {
-                            readText[i] = e.FullPath;
-                        }
-                        writeToKonzole(readText[i] + Environment.NewLine);
-                    }
-                    File.WriteAllLines(folderPath + "\\" + package + ".txt", readText);    
-                    file = new System.IO.StreamWriter(folderPath + "\\" + package + ".txt", true);
+                if (clean) {
+                    writeToKonzole("File: " + e.OldFullPath + " renamed to " + e.FullPath + Environment.NewLine);
+                    if (changes.Contains(e.OldFullPath)) changes.Remove(e.OldFullPath);
+                    if (!changes.Contains(e.FullPath)) changes.Add(e.FullPath, e.FullPath);
                 }
             }
         }
@@ -310,7 +277,6 @@ namespace Administration
         {
             button1.Enabled = false;
             startFileWatchers();
-            //file = new System.IO.StreamWriter(folderPath + "\\" + package + ".txt", true);
             ExportKey("HKEY_CURRENT_USER\\SOFTWARE", folderPath + "\\before.reg");
             writeToKonzole("Registre exportnute" + Environment.NewLine);
             button2.Enabled = true;
@@ -323,13 +289,20 @@ namespace Administration
             foreach (FileSystemWatcher watcher in watchers) {
                 watcher.EnableRaisingEvents = false;
             }
-            file = new System.IO.StreamWriter(folderPath + "\\" + package + ".txt", false);
-            foreach (DictionaryEntry de in changes)
-            {
-                file.WriteLine(de.Value);
+            copyTrackedFiles();
+            try
+            { 
+                file = new System.IO.StreamWriter(folderPath + "\\" + package + ".txt", false);
+                foreach (DictionaryEntry de in changes)
+                {
+                    file.WriteLine(de.Value);
+                }
+                file.Close();
             }
-            file.Close();
-            //copyTrackedFiles();
+            catch (IOException)
+            {
+                MessageBox.Show("Nastala chyba v zapise do zoznamu");
+            }
             writeToKonzole("Subory odkopirovane" + Environment.NewLine);
             ExportKey("HKEY_CURRENT_USER\\SOFTWARE", folderPath + "\\after.reg");
             writeToKonzole("Registre exportnute" + Environment.NewLine);
