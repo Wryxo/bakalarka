@@ -26,6 +26,7 @@ namespace Administration
     {
         List<FileSystemWatcher> watchers = new List<FileSystemWatcher>();
         System.IO.StreamWriter file;
+        Hashtable changes = new Hashtable();
         string folderName;
         string folderPath;
         string package;
@@ -91,7 +92,8 @@ namespace Administration
                     if (clean && !words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg") && File.Exists(e.FullPath))
                     {
                         writeToKonzole("File: " + e.FullPath + " " + e.ChangeType + Environment.NewLine);
-                        file.WriteLine(e.FullPath);
+                        changes.Add(e.FullPath, e.FullPath);
+                        //file.WriteLine(e.FullPath);
                     }
                 }
                 catch (IOException)
@@ -105,12 +107,12 @@ namespace Administration
                 {
                     bool nasiel = false;
                     bool clean = true;
-                    file.Close();
-                    string[] readText = File.ReadAllLines(folderPath + "\\" + package + ".txt");
-                    file = new System.IO.StreamWriter(folderPath + "\\" + package + ".txt", true);
-                    foreach (string s in readText) {
+                    //file.Close();
+                    //string[] readText = File.ReadAllLines(folderPath + "\\" + package + ".txt");
+                    //file = new System.IO.StreamWriter(folderPath + "\\" + package + ".txt", true);
+                    /*foreach (string s in readText) {
                         if (s.Equals(e.FullPath)) nasiel = true;
-                    }
+                    }*/
                     foreach (string s in banned)
                     {
                         if (e.FullPath.ToLower().Contains(s)) clean = false;
@@ -120,7 +122,8 @@ namespace Administration
                         if (clean && !nasiel && !words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg"))
                         {
                             writeToKonzole("File: " + e.FullPath + " " + e.ChangeType + Environment.NewLine);
-                            file.WriteLine(e.FullPath);
+                            if (!changes.Contains(e.FullPath)) changes.Add(e.FullPath, e.FullPath);
+                            //file.WriteLine(e.FullPath);
                         }
                     }
                     catch (IOException)
@@ -307,7 +310,7 @@ namespace Administration
         {
             button1.Enabled = false;
             startFileWatchers();
-            file = new System.IO.StreamWriter(folderPath + "\\" + package + ".txt", true);
+            //file = new System.IO.StreamWriter(folderPath + "\\" + package + ".txt", true);
             ExportKey("HKEY_CURRENT_USER\\SOFTWARE", folderPath + "\\before.reg");
             writeToKonzole("Registre exportnute" + Environment.NewLine);
             button2.Enabled = true;
@@ -316,12 +319,17 @@ namespace Administration
 
         private void button2_Click(object sender, EventArgs e)
         {
-            file.Close();
             button2.Enabled = false;
             foreach (FileSystemWatcher watcher in watchers) {
                 watcher.EnableRaisingEvents = false;
             }
-            copyTrackedFiles();
+            file = new System.IO.StreamWriter(folderPath + "\\" + package + ".txt", false);
+            foreach (DictionaryEntry de in changes)
+            {
+                file.WriteLine(de.Value);
+            }
+            file.Close();
+            //copyTrackedFiles();
             writeToKonzole("Subory odkopirovane" + Environment.NewLine);
             ExportKey("HKEY_CURRENT_USER\\SOFTWARE", folderPath + "\\after.reg");
             writeToKonzole("Registre exportnute" + Environment.NewLine);
