@@ -1,4 +1,5 @@
 ﻿using DifferenceEngine;
+using Microsoft.Win32;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -30,15 +31,26 @@ namespace Administration
         string folderName;
         string folderPath;
         string package;
+        string instType;
+        string keyName = @"HKEY_CURRENT_USER\Software\SetItUp";
         string[] banned = new string[] {"cache", "cookies", "temp", "tmp", "appdata"};
+        List<string> shortcuts = new List<string>();
+        string[] packList;
 
         public Form1()
         {
-            String tmp = Directory.GetCurrentDirectory();
-            folderName = tmp + "\\Packages";
-            //folderName = "D:\\Bakalar\\Packages";
+            ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, policy) =>
+            {
+                return true;
+            };
+            folderName = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
             if (!Directory.Exists(folderName)) System.IO.Directory.CreateDirectory(folderName);
+            using (WebClient myWebClient = new WebClient())
+            {
+                myWebClient.DownloadFile("https://localhost:44300/packages.txt", folderName+"\\packages.txt");
+            }
             InitializeComponent();
+            packList = File.ReadAllLines(folderName + "\\packages.txt");      
         }
 
         [PermissionSet(SecurityAction.Demand, Name = "FullTrust")]
@@ -133,13 +145,14 @@ namespace Administration
                             dialog.nazov(words[words.Length-1]);
                             if (dialog.ShowDialog(this) == DialogResult.OK)
                             {
-                                writeToKonzole(dialog.shortcut() + Environment.NewLine);
+                                /*writeToKonzole(dialog.shortcut() + Environment.NewLine);
                                 var wsh = new IWshRuntimeLibrary.IWshShell_Class();
                                 IWshRuntimeLibrary.IWshShortcut shortcut = wsh.CreateShortcut(
                                     Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\Packages\\" + dialog.shortcut() + ".lnk") as IWshRuntimeLibrary.IWshShortcut;
                                 shortcut.Arguments = package + " \"" + line + "\"";
                                 shortcut.TargetPath = @"D:\\Bakalar\\UserApp\\UserApp\\bin\\Debug\\UserApp.exe";
-                                shortcut.Save();
+                                shortcut.Save();*/
+                                shortcuts.Add(dialog.shortcut() + " " + line);
                             }
                             else
                             {
@@ -275,6 +288,8 @@ namespace Administration
 
         private void button1_Click(object sender, EventArgs e)
         {
+            changes.Clear();
+            shortcuts.Clear();
             button1.Enabled = false;
             startFileWatchers();
             ExportKey("HKEY_CURRENT_USER\\SOFTWARE", folderPath + "\\before.reg");
@@ -289,6 +304,22 @@ namespace Administration
             foreach (FileSystemWatcher watcher in watchers) {
                 watcher.EnableRaisingEvents = false;
             }
+            Form3 dependDialog = new Form3();
+            dependDialog.addData(packList);
+            dependDialog.StartPosition = FormStartPosition.CenterParent;
+            if (dependDialog.ShowDialog(this) == DialogResult.OK)
+            {
+                File.WriteAllLines(folderPath + "\\depedencies.txt", dependDialog.getData());
+            }
+            Form4 instTypeDialog = new Form4();
+            if (instTypeDialog.ShowDialog(this) == DialogResult.OK)
+            {
+                instType = "m";
+            }
+            else
+            {
+                instType = "a";
+            }
             copyTrackedFiles();
             try
             { 
@@ -296,6 +327,20 @@ namespace Administration
                 foreach (DictionaryEntry de in changes)
                 {
                     file.WriteLine(de.Value);
+                }
+                file.Close();
+            }
+            catch (IOException)
+            {
+                MessageBox.Show("Nastala chyba v zapise do zoznamu");
+            }
+            try
+            {
+                file = new System.IO.StreamWriter(folderName + "\\packages.txt", true);
+                file.WriteLine("p"+ instType + " " + package);
+                foreach (string sc in shortcuts)
+                {
+                    file.WriteLine("s " + sc);
                 }
                 file.Close();
             }
@@ -312,44 +357,6 @@ namespace Administration
             File.Delete(folderPath + "\\before.reg");
             button1.Enabled = true;
             writeToKonzole(package + " zaznamenany" + Environment.NewLine);
-        }
-
-        private void button3_Click(object sender, EventArgs e)
-        {
-            FileStream tmp = new FileStream("D:\\upload.zip", FileMode.Open);
-            byte[] tmp2 = File.ReadAllBytes("D:\\upload.txt");
-            Stream aaa = Upload("https://localhost:44300/upload.cshtml", "asdf", tmp, tmp2);
-            byte[] buff = new byte[10000];
-            aaa.Read(buff, 0, 9000);
-            for (int i = 0; i < buff.Length; i++)
-            {
-                writeToKonzole(Convert.ToChar(buff[i]) + " ");
-            }
-        }
-
-        private System.IO.Stream Upload(string actionUrl, string paramString, Stream paramFileStream, byte[] paramFileBytes)
-        {
-            HttpContent stringContent = new StringContent(paramString);
-            HttpContent fileStreamContent = new StreamContent(paramFileStream);
-            HttpContent bytesContent = new ByteArrayContent(paramFileBytes);
-            using (var client = new HttpClient())
-            using (var formData = new MultipartFormDataContent())
-            {
-                ServicePointManager.ServerCertificateValidationCallback =
-                (object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors) =>
-                {
-                    return true;
-                };
-                formData.Add(stringContent, "param1", "param1");
-                formData.Add(fileStreamContent, "file1", "upload.zip");
-                formData.Add(bytesContent, "file2", "file2");
-                var response = client.PostAsync(actionUrl, formData).Result;
-                if (!response.IsSuccessStatusCode)
-                {
-                    return null;
-                }
-                return response.Content.ReadAsStreamAsync().Result;
-            }
         }
     }
 }
