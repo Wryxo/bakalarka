@@ -43,7 +43,22 @@ namespace UserApp
                     myWebClient.DownloadFile("https://localhost:44300/"+package+".zip", "D:\\Bakalar\\Temp\\"+package+".zip");
                 }
                 folderName = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
-                ZipFile.ExtractToDirectory("D:\\Bakalar\\Temp\\" + package + ".zip", folderName);
+                if (folderName == "Not Exist")
+                {
+                    Console.WriteLine("Nenasiel som zlozku pre balicky" + Environment.NewLine);
+                    Console.ReadKey();
+                    return;
+                }
+                try 
+                { 
+                    ZipFile.ExtractToDirectory("D:\\Bakalar\\Temp\\" + package + ".zip", folderName);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Nastala chyba pri rozbaleni archivu " + ex.Message + Environment.NewLine);
+                    Console.ReadKey();
+                    return;
+                }
                 folderPath = System.IO.Path.Combine(folderName, package);
                 if (System.IO.File.Exists(System.IO.Path.Combine(folderPath, package + ".txt")))
                 {
@@ -58,7 +73,16 @@ namespace UserApp
                                 {
                                     Directory.CreateDirectory(Path.GetDirectoryName(line));
                                 }
-                                System.IO.File.Copy(System.IO.Path.Combine(folderPath, newPath), line, true);
+                                try 
+                                { 
+                                    System.IO.File.Copy(System.IO.Path.Combine(folderPath, newPath), line, true);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine("Nastala chyba pri kopirovani suboru " + ex.Message + Environment.NewLine);
+                                    Console.ReadKey();
+                                    return;
+                                }
                             }
                         }
                     }
@@ -77,7 +101,16 @@ namespace UserApp
                         {
                             proc.StartInfo.FileName = executable;
                             //proc.StartInfo.UseShellExecute = false;
-                            proc = Process.Start(executable);
+                            try 
+                            { 
+                                proc = Process.Start(executable);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine("Nastala chyba pri spusteni programu " + ex.Message + Environment.NewLine);
+                                Console.ReadKey();
+                                return;
+                            }
 
                             if (proc != null) proc.WaitForExit();
                         }
@@ -97,43 +130,51 @@ namespace UserApp
             {
                 /*Console.WriteLine("Zle zadane argumenty"+ Environment.NewLine);
                 Console.ReadKey();*/
-                string packageDir = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
-                if (packageDir == null) {
-                    Console.WriteLine("kluc neexistuje, vytvaram novy");
-                    RegistryKey key = Registry.CurrentUser.OpenSubKey("Software",true);
-                    key.CreateSubKey("SetItUp");
-                    key = key.OpenSubKey("SetItUp", true);
-                    key.SetValue("packageDir", "D:\\Bakalar\\Packages");
+                string packageDir;
+                string shortcutDir;
+                string installDir;
+                int lastUpdate;
+                try 
+                { 
                     packageDir = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
-                }
-                string shortcutDir = (string)Registry.GetValue(keyName, "shortcutDir", "Not Exist");
-                if (shortcutDir == "Not Exist")
-                {
-                    Console.WriteLine("kluc neexistuje, vytvaram novy - Shortcut");
-                    RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
-                    key = key.OpenSubKey("SetItUp", true);
-                    key.SetValue("shortcutDir", "D:\\Bakalar\\Shortcuts");
+                    if (packageDir == null) {
+                        RegistryKey key = Registry.CurrentUser.OpenSubKey("Software",true);
+                        key.CreateSubKey("SetItUp");
+                        key = key.OpenSubKey("SetItUp", true);
+                        key.SetValue("packageDir", "D:\\Bakalar\\Packages");
+                        packageDir = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
+                    }
                     shortcutDir = (string)Registry.GetValue(keyName, "shortcutDir", "Not Exist");
-                }
-                string installDir = (string)Registry.GetValue(keyName, "installDir", "Not Exist");
-                if (installDir == "Not Exist")
-                {
-                    Console.WriteLine("kluc neexistuje, vytvaram novy - Install");
-                    RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
-                    key = key.OpenSubKey("SetItUp", true);
-                    key.SetValue("installDir", "C:\\Users\\Wryxo\\Documents\\GitHub\\bakalarka\\UserApp\\UserApp\\bin\\Debug\\UserApp.exe");
+                    if (shortcutDir == "Not Exist")
+                    {
+                        RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
+                        key = key.OpenSubKey("SetItUp", true);
+                        key.SetValue("shortcutDir", "D:\\Bakalar\\Shortcuts");
+                        shortcutDir = (string)Registry.GetValue(keyName, "shortcutDir", "Not Exist");
+                    }
                     installDir = (string)Registry.GetValue(keyName, "installDir", "Not Exist");
-                }
-                int lastUpdate = (int)Registry.GetValue(keyName, "lastUpdate", -1337);
-                if (lastUpdate == -1337)
-                {
-                    Console.WriteLine("kluc neexistuje, vytvaram novy - lastUpdate");
-                    RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
-                    key = key.OpenSubKey("SetItUp", true);
-                    key.SetValue("lastUpdate", 1);
+                    if (installDir == "Not Exist")
+                    {
+                        RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
+                        key = key.OpenSubKey("SetItUp", true);
+                        key.SetValue("installDir", "C:\\Users\\Wryxo\\Documents\\GitHub\\bakalarka\\UserApp\\UserApp\\bin\\Debug\\UserApp.exe");
+                        installDir = (string)Registry.GetValue(keyName, "installDir", "Not Exist");
+                    }
                     lastUpdate = (int)Registry.GetValue(keyName, "lastUpdate", -1337);
+                    if (lastUpdate == -1337)
+                    {
+                        RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
+                        key = key.OpenSubKey("SetItUp", true);
+                        key.SetValue("lastUpdate", 1);
+                        lastUpdate = (int)Registry.GetValue(keyName, "lastUpdate", -1337);
+                    }
                 }
-                
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Nastala chyba pri narabani s registrami " + ex.Message + Environment.NewLine);
+                    Console.ReadKey();
+                    return;
+                }
                 using (WebClient myWebClient = new WebClient())
                 {
                     myWebClient.DownloadFile("https://localhost:44300/packages.txt", packageDir+"\\packages.txt");
@@ -166,8 +207,6 @@ namespace UserApp
                         shortcut.Save();
                     }
                 }
-                Console.WriteLine("snad sa podarilo " + Environment.GetFolderPath(Environment.SpecialFolder.Startup));
-                Console.ReadKey();
             }
         }
 

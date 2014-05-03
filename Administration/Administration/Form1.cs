@@ -43,14 +43,30 @@ namespace Administration
             {
                 return true;
             };
+            try { 
             folderName = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
             if (!Directory.Exists(folderName)) System.IO.Directory.CreateDirectory(folderName);
-            using (WebClient myWebClient = new WebClient())
-            {
-                myWebClient.DownloadFile("https://localhost:44300/packages.txt", folderName+"\\packages.txt");
             }
+            catch (Exception)
+            {
+                MessageBox.Show("Nastala chyba pri nacitani/vytvoreni zlozky pre balicky");
+                return;
+            }
+            WebClient myWebClient = null;
+            try  {
+                myWebClient = new WebClient();
+                myWebClient.DownloadFile("https://localhost:44300/packages.txt", folderName + "\\packages.txt");
+                packList = File.ReadAllLines(folderName + "\\packages.txt");
+            } 
+            catch (Exception) 
+            {
+                MessageBox.Show("Nastala chyba pri stahovani zoznamu balickov");
+            }
+            finally
+            {
+                if (myWebClient != null) myWebClient.Dispose();   
+            }   
             InitializeComponent();
-            packList = File.ReadAllLines(folderName + "\\packages.txt");      
         }
 
         [PermissionSet(SecurityAction.Demand, Name = "FullTrust")]
@@ -291,9 +307,16 @@ namespace Administration
             changes.Clear();
             shortcuts.Clear();
             button1.Enabled = false;
-            startFileWatchers();
-            ExportKey("HKEY_CURRENT_USER\\SOFTWARE", folderPath + "\\before.reg");
-            writeToKonzole("Registre exportnute" + Environment.NewLine);
+            try 
+            { 
+                startFileWatchers();
+                ExportKey("HKEY_CURRENT_USER\\SOFTWARE", folderPath + "\\before.reg");
+                writeToKonzole("Registre exportnute" + Environment.NewLine);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Nastala chyba v spusteni odchytavania " + ex.Message);
+            }       
             button2.Enabled = true;
         }
 
@@ -309,7 +332,14 @@ namespace Administration
             dependDialog.StartPosition = FormStartPosition.CenterParent;
             if (dependDialog.ShowDialog(this) == DialogResult.OK)
             {
-                File.WriteAllLines(folderPath + "\\depedencies.txt", dependDialog.getData());
+                try 
+                { 
+                    File.WriteAllLines(folderPath + "\\depedencies.txt", dependDialog.getData());
+                } 
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Nastala chyba pri zapise zavislosti " + ex.Message);
+                }
             }
             Form4 instTypeDialog = new Form4();
             if (instTypeDialog.ShowDialog(this) == DialogResult.OK)
@@ -320,7 +350,14 @@ namespace Administration
             {
                 instType = "a";
             }
-            copyTrackedFiles();
+            try
+            {
+                copyTrackedFiles();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Nastala chyba pri kopirovani suborov " + ex.Message);
+            }
             try
             { 
                 file = new System.IO.StreamWriter(folderPath + "\\" + package + ".txt", false);
@@ -332,7 +369,7 @@ namespace Administration
             }
             catch (IOException)
             {
-                MessageBox.Show("Nastala chyba v zapise do zoznamu");
+                MessageBox.Show("Nastala chyba v zapise do zoznamu suborov");
             }
             try
             {
@@ -346,7 +383,7 @@ namespace Administration
             }
             catch (IOException)
             {
-                MessageBox.Show("Nastala chyba v zapise do zoznamu");
+                MessageBox.Show("Nastala chyba v zapise do zoznamu balickov");
             }
             writeToKonzole("Subory odkopirovane" + Environment.NewLine);
             ExportKey("HKEY_CURRENT_USER\\SOFTWARE", folderPath + "\\after.reg");
