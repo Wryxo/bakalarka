@@ -8,13 +8,18 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace Administration
+namespace UserApp
 {
-    public partial class Form4 : Form
+    public partial class Form1 : Form
     {
-        public Form4()
+        public Form1()
         {
             InitializeComponent();
+        }
+
+        public string getData()
+        {
+            return textBox1.Text;
         }
     }
 }

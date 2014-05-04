@@ -1,6 +1,6 @@
 ﻿namespace Administration
 {
-    partial class Form2
+    partial class ExecutableDialog
     {
         /// <summary>
         /// Required designer variable.

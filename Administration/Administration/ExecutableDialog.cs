@@ -10,9 +10,9 @@ using System.Windows.Forms;
 
 namespace Administration
 {
-    public partial class Form2 : Form
+    public partial class ExecutableDialog : Form
     {
-        public Form2()
+        public ExecutableDialog()
         {
             InitializeComponent();
             button1.DialogResult = DialogResult.OK;

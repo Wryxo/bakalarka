@@ -33,12 +33,14 @@ namespace Administration
         string package;
         string instType;
         string keyName = @"HKEY_CURRENT_USER\Software\SetItUp";
+        // slova ktore sa nemozu vyskytnut v ceste k suboru alebo v nazve suboru    
         string[] banned = new string[] {"cache", "cookies", "temp", "tmp", "appdata"};
         List<string> shortcuts = new List<string>();
         string[] packList;
 
         public Form1()
         {
+            // server zatial nema certifikat, automaticky akceptujeme
             ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, policy) =>
             {
                 return true;
@@ -52,6 +54,7 @@ namespace Administration
                 MessageBox.Show("Nastala chyba pri nacitani/vytvoreni zlozky pre balicky");
                 return;
             }
+            // stiahneme najnovsi zoznam balickov
             WebClient myWebClient = null;
             try  {
                 myWebClient = new WebClient();
@@ -77,44 +80,45 @@ namespace Administration
             System.IO.Directory.CreateDirectory(folderPath);
 
             DriveInfo[] allDrives = DriveInfo.GetDrives();
+            // pre kazdy pevny disk spustime watchera
             foreach (DriveInfo d in allDrives)
             {
                 if (d.DriveType == DriveType.Fixed) 
                 { 
                     FileSystemWatcher watcher = new FileSystemWatcher();
-                    // Create a new FileSystemWatcher and set its properties.
+                    
+                    // rekurzivne pocuvame na danej ceste - disku
                     watcher.Path = d.Name;
                     watcher.IncludeSubdirectories = true;
-                    /* Watch for changes in LastAccess and LastWrite times, and
-                       the renaming of files or directories. */
+                    
+                    // pocuvame na zapis, zmenu mena alebo zmenu zlozky
                     watcher.NotifyFilter = NotifyFilters.LastWrite
                        | NotifyFilters.FileName | NotifyFilters.DirectoryName;
 
-                    // Add event handlers.
+                    // pridame funkcie k listenerom
                     watcher.Changed += new FileSystemEventHandler(OnChanged);
                     watcher.Created += new FileSystemEventHandler(OnChanged);
                     watcher.Deleted += new FileSystemEventHandler(OnChanged);
                     watcher.Renamed += new RenamedEventHandler(OnRenamed);
 
-                    // Begin watching.
                     watcher.EnableRaisingEvents = true;
                     watchers.Add(watcher);
                 }
             }
         }
 
-        // Define the event handlers. 
         private void OnChanged(object source, FileSystemEventArgs e)
         {
-            // Specify what is done when a file is changed, created, or deleted.
             string[] words = e.FullPath.Split('\\');
             if (e.ChangeType == System.IO.WatcherChangeTypes.Created)
             {
                 bool clean = true;
+                // skontrolujeme ci neobsahuje zakazane slovo
                 foreach (string s in banned)
                 {
                     if (e.FullPath.ToLower().Contains(s)) clean = false;
                 }
+                // ak to nema zakazane slovo, existuje a nie je to subor ktory sme my vytvorili, zapiseme si ho
                 if (clean && !words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg") && File.Exists(e.FullPath))
                 {
                     writeToKonzole("File: " + e.FullPath + " " + e.ChangeType + Environment.NewLine);
@@ -126,58 +130,18 @@ namespace Administration
                 {
                     bool nasiel = false;
                     bool clean = true;
+                    // skontrolujeme ci neobsahuje zakazane slovo
                     foreach (string s in banned)
                     {
                         if (e.FullPath.ToLower().Contains(s)) clean = false;
                     }
+                    // ak to nema zakazane slovo, existuje a nie je to subor ktory sme my vytvorili, zapiseme si ho
                     if (clean && !nasiel && !words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg"))
                     {
                         writeToKonzole("File: " + e.FullPath + " " + e.ChangeType + Environment.NewLine);
                         if (!changes.Contains(e.FullPath)) changes.Add(e.FullPath, e.FullPath);
                     }
                 }    
-            }
-        }
-
-        private void copyTrackedFiles()
-        {
-            if (!Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\Packages")) Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\Packages");
-            foreach (DictionaryEntry de in changes)
-            {
-                string line = (string)de.Value;
-                string newPath = line.Substring(3);
-                if (File.Exists(line)) { 
-                    if (!Directory.Exists(Path.GetDirectoryName(System.IO.Path.Combine(folderPath, newPath))))
-                    {
-                        Directory.CreateDirectory(Path.GetDirectoryName(System.IO.Path.Combine(folderPath, newPath)));
-                    }
-                    if (File.Exists(line))
-                    {
-                        if (line.Contains(".exe"))
-                        {                            
-                            string[] words = line.Split('\\');
-                            Form2 dialog = new Form2();
-                            dialog.StartPosition = FormStartPosition.CenterParent;
-                            dialog.nazov(words[words.Length-1]);
-                            if (dialog.ShowDialog(this) == DialogResult.OK)
-                            {
-                                /*writeToKonzole(dialog.shortcut() + Environment.NewLine);
-                                var wsh = new IWshRuntimeLibrary.IWshShell_Class();
-                                IWshRuntimeLibrary.IWshShortcut shortcut = wsh.CreateShortcut(
-                                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\Packages\\" + dialog.shortcut() + ".lnk") as IWshRuntimeLibrary.IWshShortcut;
-                                shortcut.Arguments = package + " \"" + line + "\"";
-                                shortcut.TargetPath = @"D:\\Bakalar\\UserApp\\UserApp\\bin\\Debug\\UserApp.exe";
-                                shortcut.Save();*/
-                                shortcuts.Add(dialog.shortcut() + " " + line);
-                            }
-                            else
-                            {
-                                writeToKonzole("Cancelled" + Environment.NewLine);
-                            }
-                        }
-                        System.IO.File.Copy(line, System.IO.Path.Combine(folderPath, newPath), true);
-                    }
-                }
             }
         }
 
@@ -191,10 +155,45 @@ namespace Administration
                 {
                     if (e.FullPath.ToLower().Contains(s)) clean = false;
                 }
-                if (clean) {
+                if (clean)
+                {
                     writeToKonzole("File: " + e.OldFullPath + " renamed to " + e.FullPath + Environment.NewLine);
                     if (changes.Contains(e.OldFullPath)) changes.Remove(e.OldFullPath);
                     if (!changes.Contains(e.FullPath)) changes.Add(e.FullPath, e.FullPath);
+                }
+            }
+        }
+
+        private void copyTrackedFiles()
+        {
+            if (!Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\Packages")) Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\Packages");
+            foreach (DictionaryEntry de in changes)
+            {
+                string line = (string)de.Value;
+                string newPath = line.Substring(3);
+                // prekopirujeme vsetky subory co bolo vytvorene alebo zmenene
+                if (File.Exists(line)) { 
+                    if (!Directory.Exists(Path.GetDirectoryName(System.IO.Path.Combine(folderPath, newPath))))
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(System.IO.Path.Combine(folderPath, newPath)));
+                    }
+                        // ak je dany subor spustitelny, opytame sa ci nan treba spravit odkaz
+                        if (line.Contains(".exe"))
+                        {                            
+                            string[] words = line.Split('\\');
+                            ExecutableDialog dialog = new ExecutableDialog();
+                            dialog.StartPosition = FormStartPosition.CenterParent;
+                            dialog.nazov(words[words.Length-1]);
+                            if (dialog.ShowDialog(this) == DialogResult.OK)
+                            {
+                                shortcuts.Add(dialog.shortcut() + " " + line);
+                            }
+                            else
+                            {
+                                writeToKonzole("Cancelled" + Environment.NewLine);
+                            }
+                        }
+                        System.IO.File.Copy(line, System.IO.Path.Combine(folderPath, newPath), true);
                 }
             }
         }
@@ -297,11 +296,13 @@ namespace Administration
             }
         }
 
+        // Vypis do textboxu co sluzi ako konzola
         private void writeToKonzole(string s)
         {
             textBox1.BeginInvoke((MethodInvoker)(() => textBox1.AppendText(s)));
         }
 
+        // Start Listen
         private void button1_Click(object sender, EventArgs e)
         {
             changes.Clear();
@@ -320,14 +321,15 @@ namespace Administration
             button2.Enabled = true;
         }
 
-
+        // Stop Listen
         private void button2_Click(object sender, EventArgs e)
         {
             button2.Enabled = false;
             foreach (FileSystemWatcher watcher in watchers) {
                 watcher.EnableRaisingEvents = false;
             }
-            Form3 dependDialog = new Form3();
+            // spytame sa na zavislosti
+            DepedenciesDialog dependDialog = new DepedenciesDialog();
             dependDialog.addData(packList);
             dependDialog.StartPosition = FormStartPosition.CenterParent;
             if (dependDialog.ShowDialog(this) == DialogResult.OK)
@@ -341,7 +343,9 @@ namespace Administration
                     MessageBox.Show("Nastala chyba pri zapise zavislosti " + ex.Message);
                 }
             }
-            Form4 instTypeDialog = new Form4();
+            // spytame sa na typ instalacie na vyziadanie alebo po starte
+            InstallTypeDialog instTypeDialog = new InstallTypeDialog();
+            instTypeDialog.StartPosition = FormStartPosition.CenterParent;
             if (instTypeDialog.ShowDialog(this) == DialogResult.OK)
             {
                 instType = "m";
@@ -350,6 +354,7 @@ namespace Administration
             {
                 instType = "a";
             }
+            // odkopirujeme subory
             try
             {
                 copyTrackedFiles();
@@ -358,6 +363,7 @@ namespace Administration
             {
                 MessageBox.Show("Nastala chyba pri kopirovani suborov " + ex.Message);
             }
+            // zapiseme zmeny ktore balik spravil
             try
             { 
                 file = new System.IO.StreamWriter(folderPath + "\\" + package + ".txt", false);
@@ -371,6 +377,7 @@ namespace Administration
             {
                 MessageBox.Show("Nastala chyba v zapise do zoznamu suborov");
             }
+            // pridame balik medzi zoznam balikov
             try
             {
                 file = new System.IO.StreamWriter(folderName + "\\packages.txt", true);
@@ -385,6 +392,7 @@ namespace Administration
             {
                 MessageBox.Show("Nastala chyba v zapise do zoznamu balickov");
             }
+            // spravime rozdiel registrov a vymazeme docasne subory
             writeToKonzole("Subory odkopirovane" + Environment.NewLine);
             ExportKey("HKEY_CURRENT_USER\\SOFTWARE", folderPath + "\\after.reg");
             writeToKonzole("Registre exportnute" + Environment.NewLine);

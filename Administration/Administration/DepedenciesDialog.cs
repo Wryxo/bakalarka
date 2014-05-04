@@ -10,9 +10,9 @@ using System.Windows.Forms;
 
 namespace Administration
 {
-    public partial class Form3 : Form
+    public partial class DepedenciesDialog : Form
     {
-        public Form3()
+        public DepedenciesDialog()
         {
             InitializeComponent();
         }

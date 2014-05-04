@@ -10,6 +10,7 @@ using System.Net;
 using Microsoft.Win32;
 using System.Security.Permissions;
 using System.IO.Compression;
+using System.Windows.Forms;
 
 namespace UserApp
 {
@@ -21,6 +22,7 @@ namespace UserApp
         [DllImport("user32.dll")]
         static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+        //https://localhost:44300/
         const int SW_HIDE = 0;
         const int SW_SHOW = 5;
         static string folderName;
@@ -28,20 +30,21 @@ namespace UserApp
         static string package;
         static string executable;
         static string keyName = @"HKEY_CURRENT_USER\Software\SetItUp";
+        static WebClient myWebClient;
 
+        [STAThread]
         static void Main(string[] args)
         {
             ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, policy) =>
             {
                 return true;
             };
+            /*
+             * Zisti ci treba spravit update alebo nainstalovat balik
+             */
             if (args.Length > 0) 
             {
                 package = args[0];
-                using (WebClient myWebClient = new WebClient())
-                {
-                    myWebClient.DownloadFile("https://localhost:44300/"+package+".zip", "D:\\Bakalar\\Temp\\"+package+".zip");
-                }
                 folderName = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
                 if (folderName == "Not Exist")
                 {
@@ -49,9 +52,15 @@ namespace UserApp
                     Console.ReadKey();
                     return;
                 }
+                //stiahni a rozbal dany balicek
+                using (WebClient myWebClient = new WebClient())
+                {
+                    string serverDir = (string)Registry.GetValue(keyName, "serverDir", "Not Exist");
+                    myWebClient.DownloadFile(serverDir+package+".zip", folderName+"Temp\\"+package+".zip");
+                }
                 try 
                 { 
-                    ZipFile.ExtractToDirectory("D:\\Bakalar\\Temp\\" + package + ".zip", folderName);
+                    ZipFile.ExtractToDirectory(folderName+"Temp\\" + package + ".zip", folderName);
                 }
                 catch (Exception ex)
                 {
@@ -63,6 +72,7 @@ namespace UserApp
                 if (System.IO.File.Exists(System.IO.Path.Combine(folderPath, package + ".txt")))
                 {
                     string[] lines = System.IO.File.ReadAllLines(System.IO.Path.Combine(folderPath, package + ".txt"));
+                    // nakopiruj vsetky subory zo zoznamu na ich miesto
                     foreach (string line in lines)
                     {
                         if (!File.Exists(line)) { 
@@ -86,9 +96,11 @@ namespace UserApp
                             }
                         }
                     }
+                    // vloz registry
                     string filePath = System.IO.Path.Combine(folderPath, package + ".reg");
                     if (File.Exists(filePath)) ImportKey(filePath);
 
+                    // ak sme dostali do parametru .exe programu, tak ho spustime
                     if (args.Length == 2) { 
                         executable = args[1];
 
@@ -128,45 +140,54 @@ namespace UserApp
             }
             else
             {
-                /*Console.WriteLine("Zle zadane argumenty"+ Environment.NewLine);
-                Console.ReadKey();*/
+                // ideme updatovat, skontrolujeme/nastavime registry
                 string packageDir;
                 string shortcutDir;
                 string installDir;
-                int lastUpdate;
+                string serverDir;
+                RegistryKey keyy = Registry.CurrentUser.OpenSubKey("Software", true);
+                keyy = keyy.OpenSubKey("SetItUp", true);
+                if (keyy == null) keyy.CreateSubKey("SetItUp");
                 try 
                 { 
                     packageDir = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
-                    if (packageDir == null) {
+                    if (packageDir == "Not Exist")
+                    {
+                        FolderBrowserDialog aaa = new FolderBrowserDialog();
+                        aaa.ShowDialog();
                         RegistryKey key = Registry.CurrentUser.OpenSubKey("Software",true);
-                        key.CreateSubKey("SetItUp");
                         key = key.OpenSubKey("SetItUp", true);
-                        key.SetValue("packageDir", "D:\\Bakalar\\Packages");
+                        key.SetValue("packageDir", aaa.SelectedPath + "\\");
                         packageDir = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
                     }
                     shortcutDir = (string)Registry.GetValue(keyName, "shortcutDir", "Not Exist");
                     if (shortcutDir == "Not Exist")
                     {
+                        FolderBrowserDialog aaa = new FolderBrowserDialog();
+                        aaa.ShowDialog();
                         RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
                         key = key.OpenSubKey("SetItUp", true);
-                        key.SetValue("shortcutDir", "D:\\Bakalar\\Shortcuts");
+                        key.SetValue("shortcutDir", aaa.SelectedPath + "\\");
                         shortcutDir = (string)Registry.GetValue(keyName, "shortcutDir", "Not Exist");
+                    }
+                    serverDir = (string)Registry.GetValue(keyName, "serverDir", "Not Exist");
+                    if (serverDir == "Not Exist")
+                    {
+                        Form1 aaa = new Form1();
+                        aaa.StartPosition = FormStartPosition.CenterParent;
+                        aaa.ShowDialog();
+                        RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
+                        key = key.OpenSubKey("SetItUp", true);
+                        key.SetValue("serverDir", aaa.getData());
+                        serverDir = (string)Registry.GetValue(keyName, "serverDir", "Not Exist");
                     }
                     installDir = (string)Registry.GetValue(keyName, "installDir", "Not Exist");
                     if (installDir == "Not Exist")
                     {
                         RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
                         key = key.OpenSubKey("SetItUp", true);
-                        key.SetValue("installDir", "C:\\Users\\Wryxo\\Documents\\GitHub\\bakalarka\\UserApp\\UserApp\\bin\\Debug\\UserApp.exe");
+                        key.SetValue("installDir", Application.StartupPath+"\\UserApp.exe");
                         installDir = (string)Registry.GetValue(keyName, "installDir", "Not Exist");
-                    }
-                    lastUpdate = (int)Registry.GetValue(keyName, "lastUpdate", -1337);
-                    if (lastUpdate == -1337)
-                    {
-                        RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
-                        key = key.OpenSubKey("SetItUp", true);
-                        key.SetValue("lastUpdate", 1);
-                        lastUpdate = (int)Registry.GetValue(keyName, "lastUpdate", -1337);
                     }
                 }
                 catch (Exception ex)
@@ -175,13 +196,24 @@ namespace UserApp
                     Console.ReadKey();
                     return;
                 }
-                using (WebClient myWebClient = new WebClient())
+                // stiahneme novy zoznam balickov
+                try
                 {
-                    myWebClient.DownloadFile("https://localhost:44300/packages.txt", packageDir+"\\packages.txt");
+                    myWebClient = new WebClient();
+                    myWebClient.DownloadFile("https://localhost:44300/packages.txt", folderName + "\\packages.txt");
+                }
+                catch (Exception)
+                {
+                    MessageBox.Show("Nastala chyba pri stahovani zoznamu balickov");
+                }
+                finally
+                {
+                    if (myWebClient != null) myWebClient.Dispose();
                 }
                 string[] packList = File.ReadAllLines(packageDir + "\\packages.txt");
                 string package = "";
                 string[] tmp;
+                // pre kazdy balik spravime shortcut
                 foreach (string line in packList)
                 {
                     tmp = line.Split(' ');
