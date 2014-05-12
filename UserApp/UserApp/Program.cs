@@ -11,10 +11,12 @@ using Microsoft.Win32;
 using System.Security.Permissions;
 using System.IO.Compression;
 using System.Windows.Forms;
+using System.Security.AccessControl;
+using System.Security.Principal;
 
 namespace UserApp
 {
-    class Program
+    class UserApp
     {
         [DllImport("kernel32.dll")]
         static extern IntPtr GetConsoleWindow();
@@ -35,10 +37,17 @@ namespace UserApp
         [STAThread]
         static void Main(string[] args)
         {
-            ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, policy) =>
+            try 
+            { 
+                ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, policy) =>
+                {
+                    return true;
+                };
+            } 
+            catch (Exception ex)
             {
-                return true;
-            };
+                MessageBox.Show(ex.Message);
+            }
             /*
              * Zisti ci treba spravit update alebo nainstalovat balik
              */
@@ -134,7 +143,7 @@ namespace UserApp
                 }
                 else
                 {
-                    Console.WriteLine("Nenasiel som instalaciu pre " + package + Environment.NewLine);
+                    Console.WriteLine("Nenasiel som instalaciu pre " + package + Environment.NewLine); 
                     Console.ReadKey();
                 }
             }
@@ -145,9 +154,14 @@ namespace UserApp
                 string shortcutDir;
                 string installDir;
                 string serverDir;
+                try { 
                 RegistryKey keyy = Registry.CurrentUser.OpenSubKey("Software", true);
                 keyy = keyy.OpenSubKey("SetItUp", true);
                 if (keyy == null) keyy.CreateSubKey("SetItUp");
+                    } catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message);
+                }
                 try 
                 { 
                     packageDir = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
@@ -200,11 +214,12 @@ namespace UserApp
                 try
                 {
                     myWebClient = new WebClient();
-                    myWebClient.DownloadFile("https://localhost:44300/packages.txt", folderName + "\\packages.txt");
+                    myWebClient.DownloadFile("https://localhost:44300/packages.txt", packageDir + "\\packages.txt");
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     MessageBox.Show("Nastala chyba pri stahovani zoznamu balickov");
+                    return;
                 }
                 finally
                 {
@@ -213,7 +228,14 @@ namespace UserApp
                 string[] packList = File.ReadAllLines(packageDir + "\\packages.txt");
                 string package = "";
                 string[] tmp;
-                // pre kazdy balik spravime shortcut
+                string computerName = System.Environment.MachineName;
+                string account = Environment.GetEnvironmentVariable("UserName");
+                WindowsIdentity mkds = WindowsIdentity.GetCurrent();
+                string userName = WindowsIdentity.GetCurrent().Name;
+                string path;
+                MessageBox.Show(account + " " + userName + " " + mkds.Owner);
+                MessageBox.Show(mkds.Actor + " " + mkds.User);
+                // pre kazdy balik spravime shortcut               
                 foreach (string line in packList)
                 {
                     tmp = line.Split(' ');
@@ -222,21 +244,33 @@ namespace UserApp
                         package = tmp[1];
                         if (line[1] == 'a')
                         {
-                            tmp = line.Split(' ');
+                            //tmp = line.Split(' ');
+                            path = Environment.GetFolderPath(Environment.SpecialFolder.Startup) + "\\" + package + ".lnk";
                             var wsh = new IWshRuntimeLibrary.IWshShell_Class();
                             IWshRuntimeLibrary.IWshShortcut shortcut = wsh.CreateShortcut(Environment.GetFolderPath(Environment.SpecialFolder.Startup) + "\\" + package + ".lnk") as IWshRuntimeLibrary.IWshShortcut;
-                            shortcut.Arguments = package;
-                            shortcut.TargetPath = installDir;
+                            shortcut.Arguments =  "/user:" + computerName + "\\AdminTest /savecred \"" + installDir + "\" " + package;
+                            shortcut.TargetPath = "C:\\Windows\\System32\\runas.exe";
                             shortcut.Save();
+                            FileSecurity fs = File.GetAccessControl(path);
+                            fs.AddAccessRule(new FileSystemAccessRule(userName, FileSystemRights.ReadAndExecute, AccessControlType.Allow));
+                            fs.AddAccessRule(new FileSystemAccessRule(@"Wryxo-PC\AdminTest", FileSystemRights.FullControl, AccessControlType.Allow));
+                            fs.SetAccessRuleProtection(true, false);
+                            File.SetAccessControl(path, fs);
                         }
                     }
                     if (line[0] == 's')
-                    {                       
+                    {
+                        path = shortcutDir + "\\" + tmp[1] + ".lnk";
                         var wsh = new IWshRuntimeLibrary.IWshShell_Class();
                         IWshRuntimeLibrary.IWshShortcut shortcut = wsh.CreateShortcut(shortcutDir + "\\" + tmp[1] + ".lnk") as IWshRuntimeLibrary.IWshShortcut;
-                        shortcut.Arguments = package + " \"" + tmp[2] + "\"";
-                        shortcut.TargetPath = installDir;
-                        shortcut.Save();
+                        shortcut.Arguments = "/user:Wryxo-PC\\AdminTest /savecred \"" + installDir + "\" " + package + " \"" + tmp[2] + "\"";
+                        shortcut.TargetPath = "C:\\Windows\\System32\\runas.exe";
+                        shortcut.Save();                    
+                        FileSecurity fs = File.GetAccessControl(path);
+                        fs.AddAccessRule(new FileSystemAccessRule(@"Wryxo-PC\wryxsk@gmail.com", FileSystemRights.FullControl, AccessControlType.Allow));
+                        fs.AddAccessRule(new FileSystemAccessRule(userName, FileSystemRights.ReadAndExecute, AccessControlType.Allow));
+                        fs.SetAccessRuleProtection(true, false);
+                        File.SetAccessControl(path, fs);
                     }
                 }
             }

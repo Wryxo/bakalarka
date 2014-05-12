@@ -12,6 +12,7 @@ namespace Administration
 {
     public partial class ExecutableDialog : Form
     {
+        
         public ExecutableDialog()
         {
             InitializeComponent();
@@ -19,15 +20,21 @@ namespace Administration
             button2.DialogResult = DialogResult.Cancel;
         }
 
-        public void nazov(string name)
+        public void addRow(object[] tmp) 
         {
-            label2.Text = name;
-            textBox1.Text = name.Substring(0, name.Length - 4);
+            dataGridView1.Rows.Add(tmp);
         }
 
-        public string shortcut()
+        public List<exelnk> getData()
         {
-            return textBox1.Text;
+            List<exelnk> a = new List<exelnk>();
+            foreach (DataGridViewRow row in dataGridView1.Rows)
+            {
+                if ((bool)row.Cells[2].Value == true) { 
+                    a.Add(new exelnk((string)row.Cells[0].Value, (string)row.Cells[1].Value));
+                } 
+            }
+            return a;
         }
     }
 }
