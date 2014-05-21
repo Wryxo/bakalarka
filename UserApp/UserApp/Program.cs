@@ -112,7 +112,9 @@ namespace UserApp
                 string serverDir;
                 RegistryKey key;
                 try 
-                { 
+                {
+                    key = Registry.LocalMachine.CreateSubKey("SOFTWARE");
+                    key = key.CreateSubKey("SetItUp");
                     packageDir = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
                     if (packageDir == "Not Exist")
                     {

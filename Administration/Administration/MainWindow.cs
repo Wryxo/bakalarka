@@ -35,7 +35,7 @@ namespace Administration
         string instType;
         string keyName = @"HKEY_LOCAL_MACHINE\SOFTWARE\SetItUp";
         // slova ktore sa nemozu vyskytnut v ceste k suboru alebo v nazve suboru    
-        string[] banned = new string[] {"cache", "cookies", "temp", "tmp", @"Chrome\User Data", "Skype"};
+        string[] banned = new string[] {"cache", "cookies", "temp", "tmp", @"chrome\user data", "skype", "ntuser.dat"};
         List<string> shortcuts = new List<string>();
         Hashtable exes = new Hashtable();
         string[] packList;
@@ -125,7 +125,7 @@ namespace Administration
                 if (clean && !words[words.Length - 1].Equals(package + ".txt") && !words[words.Length - 1].Equals("before.reg") && !words[words.Length - 1].Equals("after.reg") && File.Exists(e.FullPath))
                 {
                     writeToKonzole("File: " + e.FullPath + " " + e.ChangeType + Environment.NewLine);
-                    changes.Add(e.FullPath, e.FullPath);
+                    if (!changes.Contains(e.FullPath)) changes.Add(e.FullPath, e.FullPath);
                 }
             } else if (e.ChangeType == System.IO.WatcherChangeTypes.Changed)
             {
@@ -184,9 +184,16 @@ namespace Administration
                         if (line.Contains(".exe") || line.Contains(".lnk"))
                         {
                             string[] words = line.Split('\\');
-                            exes.Add(words[words.Length-1], line);
+                            if (!exes.ContainsKey(words[words.Length - 1])) exes.Add(words[words.Length - 1], line);
                         }
-                        System.IO.File.Copy(line, System.IO.Path.Combine(folderPath, newPath), true);
+                        try
+                        {
+                            System.IO.File.Copy(line, System.IO.Path.Combine(folderPath, newPath), true);
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show("Nepodarilo sa odkopirovat subor " + ex.Message);
+                        }
                 }
             }
         }
@@ -364,14 +371,7 @@ namespace Administration
                 }
             }
             // odkopirujeme subory
-            try
-            {
-                copyTrackedFiles();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Nastala chyba pri kopirovani suborov " + ex.Message);
-            }
+            copyTrackedFiles();
             // spytame sa na typ instalacie na vyziadanie alebo po starte
             InstallTypeDialog instTypeDialog = new InstallTypeDialog();
             instTypeDialog.StartPosition = FormStartPosition.CenterParent;

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Win32;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -22,18 +23,18 @@ namespace SetItUpService
         public SetItUpService()
         {
             InitializeComponent();
-            if (!System.Diagnostics.EventLog.SourceExists("MySource"))
+            if (!System.Diagnostics.EventLog.SourceExists("SetItUp"))
             {
                 System.Diagnostics.EventLog.CreateEventSource(
-                    "MySource", "MyNewLog");
+                    "SetItUp", "DebugLog");
             }
-            eventLog1.Source = "MySource";
-            eventLog1.Log = "MyNewLog";
+            eventLog1.Source = "SetItUp";
+            eventLog1.Log = "DebugLog";
         }
 
         protected override void OnStart(string[] args)
         {
-            eventLog1.WriteEntry("In OnStart");
+            eventLog1.WriteEntry("Spustam sluzbu");
             Task.Run(() => InitShortcuts());
         }
 
@@ -107,22 +108,18 @@ namespace SetItUpService
 
         protected override void OnStop()
         {
-            eventLog1.WriteEntry("In onStop.");
+            eventLog1.WriteEntry("Zastavujem sluzbu");
         }
 
         protected override void OnCustomCommand(int command)
         {
-            eventLog1.WriteEntry("In onCC. " + command);
             if (command == 200) Task.Run(() => InstallPackage());
         }
 
         private void InstallPackage()
         {
+            Queue<string> fronta = new Queue<string>();
             string installDir = (string)Registry.GetValue(keyName, "installDir", "Not Exist");
-            string[] fileContent = File.ReadAllLines(installDir + "Last.txt");
-            string package = fileContent[0];
-            eventLog1.WriteEntry("CC " + package);
-
             string folderName = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
             if (folderName == "Not Exist")
             {
@@ -133,81 +130,101 @@ namespace SetItUpService
             {
                 Directory.CreateDirectory(folderName);
             }
-            //stiahni a rozbal dany balicek
-            if (!File.Exists(folderName + "\\" + package + ".zip"))
-            {
-                /*try
+            string[] fileContent = File.ReadAllLines(installDir + "Last.txt");
+            string package = "";
+            fronta.Enqueue(fileContent[0]);
+            while (fronta.Count != 0) {
+                package = fronta.Dequeue();
+                eventLog1.WriteEntry("Instalujem balik " + package);
+                //stiahni a rozbal dany balicek
+                if (!File.Exists(folderName + "\\" + package + ".zip"))
                 {
-                    ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, policy) =>
+                    /*try
                     {
-                        return true;
-                    };
+                        ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, policy) =>
+                        {
+                            return true;
+                        };
+                    }
+                    catch (Exception ex)
+                    {
+                        eventLog1.WriteEntry(ex.Message);
+                    }*/
+                    WebClient myWebClient = new WebClient();
+                    try
+                    {
+                        string serverDir = (string)Registry.GetValue(keyName, "serverDir", "Not Exist"); 
+                        myWebClient.DownloadFile(serverDir + package + ".zip", folderName + "\\" + package + ".zip");
+                    }
+                    catch (Exception ex)
+                    {
+                        eventLog1.WriteEntry("Nastala chyba pri stahovani balicka " + ex.Message);
+                        return;
+                    }
+                    finally
+                    {
+                        if (myWebClient != null) myWebClient.Dispose();
+                    }
                 }
-                catch (Exception ex)
-                {
-                    eventLog1.WriteEntry(ex.Message);
-                }*/
-                WebClient myWebClient = new WebClient();
+                string folderPath = System.IO.Path.Combine(folderName, package);
                 try
                 {
-                    string serverDir = (string)Registry.GetValue(keyName, "serverDir", "Not Exist"); 
-                    myWebClient.DownloadFile(serverDir + package + ".zip", folderName + "\\" + package + ".zip");
+                    if (Directory.Exists(folderPath)) Directory.Delete(folderPath, true);
+                    ZipFile.ExtractToDirectory(folderName + "\\" + package + ".zip", folderName);
                 }
                 catch (Exception ex)
                 {
-                    eventLog1.WriteEntry("Nastala chyba pri stahovani balicka " + ex.Message);
+                    eventLog1.WriteEntry("Nastala chyba pri rozbaleni archivu " + ex.Message);
                     return;
                 }
-                finally
+                
+                if (System.IO.File.Exists(System.IO.Path.Combine(folderPath, package + ".txt")))
                 {
-                    if (myWebClient != null) myWebClient.Dispose();
-                }
-            }
-            try
-            {
-                ZipFile.ExtractToDirectory(folderName + "\\" + package + ".zip", folderName);
-            }
-            catch (Exception ex)
-            {
-                eventLog1.WriteEntry("Nastala chyba pri rozbaleni archivu " + ex.Message);
-                return;
-            }
-            string folderPath = System.IO.Path.Combine(folderName, package);
-            if (System.IO.File.Exists(System.IO.Path.Combine(folderPath, package + ".txt")))
-            {
-                string[] lines = System.IO.File.ReadAllLines(System.IO.Path.Combine(folderPath, package + ".txt"));
-                foreach (string line in lines)
-                {
-                    if (!File.Exists(line))
+                    string[] lines = System.IO.File.ReadAllLines(System.IO.Path.Combine(folderPath, package + ".txt"));
+                    foreach (string line in lines)
                     {
-                        string newPath = line.Substring(3);
-                        if (File.Exists(System.IO.Path.Combine(folderPath, newPath)))
+                        if (!File.Exists(line))
                         {
-                            if (!Directory.Exists(Path.GetDirectoryName(line)))
+                            string newPath = line.Substring(3);
+                            if (File.Exists(System.IO.Path.Combine(folderPath, newPath)))
                             {
-                                Directory.CreateDirectory(Path.GetDirectoryName(line));
-                            }
-                            try
-                            {
-                                System.IO.File.Copy(System.IO.Path.Combine(folderPath, newPath), line, true);
-                            }
-                            catch (Exception ex)
-                            {
-                                eventLog1.WriteEntry("Nastala chyba pri kopirovani suboru " + ex.Message);
-                                return;
+                                if (!Directory.Exists(Path.GetDirectoryName(line)))
+                                {
+                                    Directory.CreateDirectory(Path.GetDirectoryName(line));
+                                }
+                                try
+                                {
+                                    System.IO.File.Copy(System.IO.Path.Combine(folderPath, newPath), line, true);
+                                }
+                                catch (Exception ex)
+                                {
+                                    eventLog1.WriteEntry("Nastala chyba pri kopirovani suboru " + ex.Message);
+                                    return;
+                                }
                             }
                         }
                     }
+                    eventLog1.WriteEntry("Importujem registry");
+                    string filePath = System.IO.Path.Combine(folderPath, package + ".reg");
+                    if (File.Exists(filePath)) ImportKey(filePath);
                 }
-                string filePath = System.IO.Path.Combine(folderPath, package + ".reg");
-                if (File.Exists(filePath)) ImportKey(filePath);
+                else
+                {
+                    eventLog1.WriteEntry("Nenasiel som instalaciu pre " + package);
+                }
+                eventLog1.WriteEntry("Pridavam potrebne baliky do fronty");
+                try { 
+                string[] depedencies = File.ReadAllLines(System.IO.Path.Combine(folderPath,"depedencies.txt"));
+                foreach (string tmp in depedencies)  if (tmp != "") fronta.Enqueue(tmp);
+                }
+                catch (Exception ex)
+                {
+                    eventLog1.WriteEntry("Chyba pri citani depedencies " + ex.Message);
+                }
+                
                 if (Directory.Exists(folderPath)) Directory.Delete(folderPath, true);
+                eventLog1.WriteEntry("Instalacia baliku " + package + " dokoncena");
             }
-            else
-            {
-                eventLog1.WriteEntry("Nenasiel som instalaciu pre " + package);
-            }
-            eventLog1.WriteEntry("Instalacia baliku " + package + " dokoncena");
             File.WriteAllText(installDir + "Last.txt", "done");
         }
 
