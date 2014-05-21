@@ -30,11 +30,12 @@ namespace Administration
         Hashtable changes = new Hashtable();
         string folderName;
         string folderPath;
+        string serverDir;
         string package;
         string instType;
-        string keyName = @"HKEY_CURRENT_USER\Software\SetItUp";
+        string keyName = @"HKEY_LOCAL_MACHINE\SOFTWARE\SetItUp";
         // slova ktore sa nemozu vyskytnut v ceste k suboru alebo v nazve suboru    
-        string[] banned = new string[] {"cache", "cookies", "temp", "tmp"};
+        string[] banned = new string[] {"cache", "cookies", "temp", "tmp", @"Chrome\User Data", "Skype"};
         List<string> shortcuts = new List<string>();
         Hashtable exes = new Hashtable();
         string[] packList;
@@ -51,16 +52,16 @@ namespace Administration
             folderName = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
             if (!Directory.Exists(folderName)) System.IO.Directory.CreateDirectory(folderName);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                MessageBox.Show("Nastala chyba pri nacitani/vytvoreni zlozky pre balicky");
+                MessageBox.Show("Nastala chyba pri nacitani/vytvoreni zlozky pre balicky " + ex.Message);
                 return;
             }
             // stiahneme najnovsi zoznam balickov
-            WebClient myWebClient = null;
+            WebClient myWebClient = new WebClient();
             try  {
-                myWebClient = new WebClient();
-                myWebClient.DownloadFile("https://localhost:44300/packages.txt", folderName + "\\packages.txt");
+                serverDir = (string)Registry.GetValue(keyName, "serverDir", "Not Exist");
+                myWebClient.DownloadFile(serverDir + "/packages.txt", folderName + "\\packages.txt");
                 packList = File.ReadAllLines(folderName + "\\packages.txt");
             } 
             catch (Exception) 
@@ -168,7 +169,7 @@ namespace Administration
 
         private void copyTrackedFiles()
         {
-            if (!Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\Packages")) Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\Packages");
+            //if (!Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\Packages")) Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\Packages");
             foreach (DictionaryEntry de in changes)
             {
                 string line = (string)de.Value;
@@ -241,6 +242,8 @@ namespace Administration
         {
             int i, j=1;
             string[] res = new string[4000];
+            string lastKey = "";
+            string tmp;
             res[0] = "Windows Registry Editor Version 5.00";
             foreach (DiffResultSpan drs in DiffLines)
             {
@@ -249,8 +252,27 @@ namespace Administration
                     case DiffResultSpanStatus.AddDestination:
                         for (i = 0; i < drs.Length; i++)
                         {
-                            res[j] = ((TextLine)destination.GetByIndex(drs.DestIndex + i)).Line.ToString();
-                            j++;
+                            tmp = ((TextLine)destination.GetByIndex(drs.DestIndex + i)).Line.ToString();
+                            if (tmp != "") {
+                                if (tmp.StartsWith("[HKEY_"))
+                                {
+                                    lastKey = tmp;
+                                }
+                                else {
+                                    j++;
+                                    res[j] = lastKey;
+                                    j++;
+                                    res[j] = tmp;
+                                    j++;
+                                }
+                            }
+                        }
+                        break;
+                    case DiffResultSpanStatus.NoChange:
+                        for (i = 0; i < drs.Length; i++)
+                        {
+                            tmp = ((TextLine)destination.GetByIndex(drs.DestIndex + i)).Line.ToString();
+                            if (tmp.StartsWith("[HKEY_")) lastKey = tmp;
                         }
                         break;
                 }
@@ -309,7 +331,7 @@ namespace Administration
             try 
             { 
                 startFileWatchers();
-                ExportKey("HKEY_CURRENT_USER\\SOFTWARE", folderPath + "\\before.reg");
+                ExportKey("HKEY_LOCAL_MACHINE\\SOFTWARE", folderPath + "\\before.reg");
                 writeToKonzole("Registre exportnute" + Environment.NewLine);
             }
             catch (Exception ex)
@@ -414,7 +436,7 @@ namespace Administration
             }
             // spravime rozdiel registrov a vymazeme docasne subory
             writeToKonzole("Subory odkopirovane" + Environment.NewLine);
-            ExportKey("HKEY_CURRENT_USER\\SOFTWARE", folderPath + "\\after.reg");
+            ExportKey("HKEY_LOCAL_MACHINE\\SOFTWARE", folderPath + "\\after.reg");
             writeToKonzole("Registre exportnute" + Environment.NewLine);
             TextDiff(folderPath + "\\before.reg", folderPath + "\\after.reg");
             writeToKonzole("Registre diffnute" + Environment.NewLine);
