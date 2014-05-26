@@ -37,28 +37,28 @@
             this.checkedListBox1.FormattingEnabled = true;
             this.checkedListBox1.Location = new System.Drawing.Point(12, 12);
             this.checkedListBox1.Name = "checkedListBox1";
-            this.checkedListBox1.Size = new System.Drawing.Size(191, 199);
+            this.checkedListBox1.Size = new System.Drawing.Size(216, 199);
             this.checkedListBox1.TabIndex = 0;
             // 
             // button1
             // 
             this.button1.DialogResult = System.Windows.Forms.DialogResult.OK;
-            this.button1.Location = new System.Drawing.Point(70, 222);
+            this.button1.Location = new System.Drawing.Point(86, 222);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(75, 23);
             this.button1.TabIndex = 1;
             this.button1.Text = "OK";
             this.button1.UseVisualStyleBackColor = true;
             // 
-            // Form3
+            // DepedenciesDialog
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(215, 257);
+            this.ClientSize = new System.Drawing.Size(240, 257);
             this.Controls.Add(this.button1);
             this.Controls.Add(this.checkedListBox1);
-            this.Name = "Form3";
-            this.Text = "Form3";
+            this.Name = "DepedenciesDialog";
+            this.Text = "Výber Závislosti";
             this.ResumeLayout(false);
 
         }

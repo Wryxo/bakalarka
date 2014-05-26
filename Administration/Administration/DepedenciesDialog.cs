@@ -23,7 +23,7 @@ namespace Administration
             {
                 if (line[0] == 'p')
                 {
-                    string[] tmp = line.Split(' ');
+                    string[] tmp = line.Split(new string[] { "~~" }, StringSplitOptions.None);
                     checkedListBox1.Items.Add(tmp[1]);
                 }
             }

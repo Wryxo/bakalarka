@@ -15,6 +15,7 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using System.ServiceProcess;
 using System.Threading;
+using System.ComponentModel;
 
 namespace UserApp
 {
@@ -52,7 +53,7 @@ namespace UserApp
              * Zisti ci treba obnovit shortcuty alebo nainstalovat balik
              */
             string installDir;
-            if (args.Length > 0) 
+            if (args.Length > 0)
             {
                 installDir = (string)Registry.GetValue(keyName, "installDir", "Not Exist");
                 package = args[0];
@@ -61,46 +62,39 @@ namespace UserApp
                 // zavolaj sluzbu a povedz je ze treba nainstalovat balik
                 ServiceController sc = new ServiceController("SetItUpService");
                 sc.ExecuteCommand(SERVICE_INSTALL_PACKAGE);
-                string ready="";
-                while (ready != "done")
+                WaitForService(installDir);
+                    // ked sluzba nainstaluje balik a do parametru sme dostali .exe programu, tak ho spustime
+                if (args.Length > 1)
                 {
-                    ready = File.ReadAllText(installDir + "Last.txt");
-                    Thread.Sleep(1000);
-                }
-                // ked sluzba nainstaluje balik a do parametru sme dostali .exe programu, tak ho spustime
-                    if (args.Length == 2) { 
-                        executable = args[1];
-
-                        var handle = GetConsoleWindow();
-
-                        // Hide
-                        ShowWindow(handle, SW_HIDE);
-                        var proc = new Process();
+                    executable = args[1];
+                    var handle = GetConsoleWindow();
+                    // Hide
+                    ShowWindow(handle, SW_HIDE);
+                    var proc = new Process();
+                    try
+                    {
+                        proc.StartInfo.FileName = executable;
+                        //proc.StartInfo.UseShellExecute = false;
                         try
                         {
-                            proc.StartInfo.FileName = executable;
-                            //proc.StartInfo.UseShellExecute = false;
-                            try 
-                            { 
-                                proc = Process.Start(executable);
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine("Nastala chyba pri spusteni programu " + ex.Message + Environment.NewLine);
-                                Console.ReadKey();
-                                return;
-                            }
-
-                            if (proc != null) proc.WaitForExit();
+                            proc = Process.Start(executable);
                         }
-                        finally
+                        catch (Exception ex)
                         {
-                            if (proc != null) proc.Dispose();
+                            Console.WriteLine("Nastala chyba pri spusteni programu " + ex.Message + Environment.NewLine);
+                            Console.ReadKey();
+                            return;
                         }
+                        if (proc != null) proc.WaitForExit();
+                    }
+                    finally
+                    {
+                        if (proc != null) proc.Dispose();
+                    }
                 }
                 else
                 {
-                    Console.WriteLine("Nenasiel som instalaciu pre " + package + Environment.NewLine); 
+                    Console.WriteLine("Nenasiel som instalaciu pre " + package + Environment.NewLine);
                     Console.ReadKey();
                 }
             }
@@ -111,7 +105,7 @@ namespace UserApp
                 string shortcutDir;
                 string serverDir;
                 RegistryKey key;
-                try 
+                try
                 {
                     key = Registry.LocalMachine.CreateSubKey("SOFTWARE");
                     key = key.CreateSubKey("SetItUp");
@@ -120,7 +114,7 @@ namespace UserApp
                     {
                         FolderBrowserDialog aaa = new FolderBrowserDialog();
                         aaa.ShowDialog();
-                        key = Registry.LocalMachine.OpenSubKey("Software",true);
+                        key = Registry.LocalMachine.OpenSubKey("Software", true);
                         key = key.CreateSubKey("SetItUp");
                         key.SetValue("packageDir", aaa.SelectedPath + "\\");
                         packageDir = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
@@ -161,6 +155,17 @@ namespace UserApp
                     Console.ReadKey();
                     return;
                 }
+            }
+        }
+
+        private static void WaitForService(string installDir)
+        {
+            Console.WriteLine("Instalujem balik");
+            string ready = "";
+            while (ready != "done")
+            {
+                ready = File.ReadAllText(installDir + "Last.txt");
+                Thread.Sleep(1000);
             }
         }
     }

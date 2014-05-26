@@ -11,6 +11,7 @@ using System.Linq;
 using System.Net;
 using System.ServiceProcess;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SetItUpService
@@ -43,7 +44,7 @@ namespace SetItUpService
             string installDir = (string)Registry.GetValue(keyName, "installDir", "Not Exist");
             string packageDir = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
             string shortcutDir = (string)Registry.GetValue(keyName, "shortcutDir", "Not Exist");
-            try
+            /*try
             {
                 ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, policy) =>
                 {
@@ -53,7 +54,7 @@ namespace SetItUpService
             catch (Exception ex)
             {
                 eventLog1.WriteEntry(ex.Message);
-            }
+            }*/
             WebClient myWebClient = new WebClient();
             try
             {
@@ -79,7 +80,8 @@ namespace SetItUpService
             // pre kazdy balik spravime shortcut               
             foreach (string line in packList)
             {
-                tmp = line.Split(' ');
+                //tmp = line.Split('~');
+                tmp = line.Split(new string[] { "~~" }, StringSplitOptions.None);
                 if (line[0] == 'p')
                 {
                     package = tmp[1];
@@ -98,7 +100,9 @@ namespace SetItUpService
                 {
                     path = shortcutDir + "\\" + tmp[1] + ".lnk";
                     var wsh = new IWshRuntimeLibrary.IWshShell_Class();
-                    IWshRuntimeLibrary.IWshShortcut shortcut = wsh.CreateShortcut(shortcutDir + "\\" + tmp[1] + ".lnk") as IWshRuntimeLibrary.IWshShortcut;
+                    IWshRuntimeLibrary.IWshShortcut shortcut = 
+                        wsh.CreateShortcut(shortcutDir + "\\" + tmp[1] + ".lnk")
+                        as IWshRuntimeLibrary.IWshShortcut;
                     shortcut.Arguments = package + " \"" + tmp[2] + "\"";
                     shortcut.TargetPath = installDir + "UserApp.exe";
                     shortcut.Save();

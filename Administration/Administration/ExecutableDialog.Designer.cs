@@ -51,12 +51,12 @@
             this.check});
             this.dataGridView1.Location = new System.Drawing.Point(12, 12);
             this.dataGridView1.Name = "dataGridView1";
-            this.dataGridView1.Size = new System.Drawing.Size(344, 246);
+            this.dataGridView1.Size = new System.Drawing.Size(512, 246);
             this.dataGridView1.TabIndex = 6;
             // 
             // button1
             // 
-            this.button1.Location = new System.Drawing.Point(102, 264);
+            this.button1.Location = new System.Drawing.Point(137, 264);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(75, 23);
             this.button1.TabIndex = 7;
@@ -65,7 +65,7 @@
             // 
             // button2
             // 
-            this.button2.Location = new System.Drawing.Point(183, 264);
+            this.button2.Location = new System.Drawing.Point(285, 264);
             this.button2.Name = "button2";
             this.button2.Size = new System.Drawing.Size(75, 23);
             this.button2.TabIndex = 8;
@@ -74,33 +74,35 @@
             // 
             // exe
             // 
-            this.exe.HeaderText = "Spustitelny subor";
+            this.exe.HeaderText = "Spustiteľný súbor";
             this.exe.Name = "exe";
             this.exe.ReadOnly = true;
             this.exe.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            this.exe.Width = 180;
             // 
             // lnk
             // 
-            this.lnk.HeaderText = "Nazov odkazu";
+            this.lnk.HeaderText = "Názov odkazu";
             this.lnk.Name = "lnk";
             this.lnk.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            this.lnk.Width = 180;
             // 
             // check
             // 
-            this.check.HeaderText = "Vytvorit";
+            this.check.HeaderText = "Vytvoriť";
             this.check.Name = "check";
-            this.check.Resizable = System.Windows.Forms.DataGridViewTriState.True;
+            this.check.Resizable = System.Windows.Forms.DataGridViewTriState.False;
             // 
             // ExecutableDialog
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(369, 299);
+            this.ClientSize = new System.Drawing.Size(536, 299);
             this.Controls.Add(this.button2);
             this.Controls.Add(this.button1);
             this.Controls.Add(this.dataGridView1);
             this.Name = "ExecutableDialog";
-            this.Text = "Form2";
+            this.Text = "Výber odkazov";
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.exelnkBindingSource)).EndInit();
             this.ResumeLayout(false);

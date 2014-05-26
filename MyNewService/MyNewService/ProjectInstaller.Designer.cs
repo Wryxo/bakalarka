@@ -39,6 +39,7 @@
             // 
             // serviceInstaller1
             // 
+            this.serviceInstaller1.Description = "Sluzba starajuca sa o instalovanie balikov programu SetItUp";
             this.serviceInstaller1.ServiceName = "SetItUpService";
             this.serviceInstaller1.StartType = System.ServiceProcess.ServiceStartMode.Automatic;
             // 

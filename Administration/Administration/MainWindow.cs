@@ -8,6 +8,7 @@ using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Management;
@@ -35,7 +36,7 @@ namespace Administration
         string instType;
         string keyName = @"HKEY_LOCAL_MACHINE\SOFTWARE\SetItUp";
         // slova ktore sa nemozu vyskytnut v ceste k suboru alebo v nazve suboru    
-        string[] banned = new string[] {"cache", "cookies", "temp", "tmp", @"chrome\user data", "skype", "ntuser.dat"};
+        List<string> banned = new List<string>();
         List<string> shortcuts = new List<string>();
         Hashtable exes = new Hashtable();
         string[] packList;
@@ -44,17 +45,30 @@ namespace Administration
         public MainWindow()
         {
             // server zatial nema certifikat, automaticky akceptujeme
-            ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, policy) =>
+            /*ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, policy) =>
             {
                 return true;
-            };
+            };*/
             try { 
-            folderName = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
-            if (!Directory.Exists(folderName)) System.IO.Directory.CreateDirectory(folderName);
+                folderName = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
+                if (!Directory.Exists(folderName)) System.IO.Directory.CreateDirectory(folderName);
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Nastala chyba pri nacitani/vytvoreni zlozky pre balicky " + ex.Message);
+                return;
+            }
+            try
+            {
+                if (File.Exists(System.IO.Path.Combine(folderName, "blacklist.txt")))
+                {
+                    banned.AddRange(File.ReadAllLines(System.IO.Path.Combine(folderName, "blacklist.txt")));
+                    banned.Add(Environment.UserName.ToLower());
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Nastala chyba pri nacitani zakazanych slov " + ex.Message);
                 return;
             }
             // stiahneme najnovsi zoznam balickov
@@ -64,9 +78,10 @@ namespace Administration
                 myWebClient.DownloadFile(serverDir + "/packages.txt", folderName + "\\packages.txt");
                 packList = File.ReadAllLines(folderName + "\\packages.txt");
             } 
-            catch (Exception) 
+            catch (Exception ex) 
             {
-                MessageBox.Show("Nastala chyba pri stahovani zoznamu balickov");
+                MessageBox.Show("Nastala chyba pri stahovani zoznamu balickov " + ex.Message);
+                packList = new string[1];
             }
             finally
             {
@@ -79,9 +94,9 @@ namespace Administration
         public void startFileWatchers()
         {
             package = textBox3.Text;
+            this.Text = "Administration - " + package;
             folderPath = System.IO.Path.Combine(folderName, package);
             System.IO.Directory.CreateDirectory(folderPath);
-
             DriveInfo[] allDrives = DriveInfo.GetDrives();
             // pre kazdy pevny disk spustime watchera
             foreach (DriveInfo d in allDrives)
@@ -181,7 +196,7 @@ namespace Administration
                         Directory.CreateDirectory(Path.GetDirectoryName(System.IO.Path.Combine(folderPath, newPath)));
                     }
                         // ak je dany subor spustitelny, opytame sa ci nan treba spravit odkaz
-                        if (line.Contains(".exe") || line.Contains(".lnk"))
+                    if (line.Contains(".exe") || line.Contains(".EXE"))
                         {
                             string[] words = line.Split('\\');
                             if (!exes.ContainsKey(words[words.Length - 1])) exes.Add(words[words.Length - 1], line);
@@ -248,10 +263,11 @@ namespace Administration
         private string[] getResults(DiffList_TextFile destination, ArrayList DiffLines)
         {
             int i, j=1;
-            string[] res = new string[4000];
+            //string[] res = new string[5000];
+            List<string> res = new List<string>();
             string lastKey = "";
             string tmp;
-            res[0] = "Windows Registry Editor Version 5.00";
+            res.Add("Windows Registry Editor Version 5.00");
             foreach (DiffResultSpan drs in DiffLines)
             {
                 switch (drs.Status)
@@ -265,12 +281,20 @@ namespace Administration
                                 {
                                     lastKey = tmp;
                                 }
-                                else {
-                                    j++;
+                                else if (tmp.StartsWith("\"") || tmp.StartsWith("@")) 
+                                {
+                                    res.Add(lastKey);
+                                    res.Add(tmp);
+                                    res.Add("");
+                                    /*j++;
                                     res[j] = lastKey;
                                     j++;
                                     res[j] = tmp;
-                                    j++;
+                                    j++;*/
+                                }
+                                else 
+                                {
+                                    res.Add(tmp);
                                 }
                             }
                         }
@@ -285,7 +309,7 @@ namespace Administration
                 }
             }
             if (j == 1) return null;
-            return res;
+            return res.ToArray();
         }
 
         private void TextDiff(string sFile, string dFile)
@@ -335,6 +359,7 @@ namespace Administration
             changes.Clear();
             shortcuts.Clear();
             button1.Enabled = false;
+            textBox3.Enabled = false;
             try 
             { 
                 startFileWatchers();
@@ -352,12 +377,18 @@ namespace Administration
         private void button2_Click(object sender, EventArgs e)
         {
             button2.Enabled = false;
-            foreach (FileSystemWatcher watcher in watchers) {
+            foreach (FileSystemWatcher watcher in watchers)
+            {
                 watcher.EnableRaisingEvents = false;
             }
             // spytame sa na zavislosti
             DepedenciesDialog dependDialog = new DepedenciesDialog();
-            dependDialog.addData(packList);
+            try 
+            { 
+                dependDialog.addData(packList);
+            } catch (Exception)
+            {
+            }
             dependDialog.StartPosition = FormStartPosition.CenterParent;
             if (dependDialog.ShowDialog(this) == DialogResult.OK)
             {
@@ -393,7 +424,7 @@ namespace Administration
                     foreach (exelnk x in tmp)
                     {
                         string a = (string)exes[x.exe];
-                        shortcuts.Add(x.lnk + " " + a);
+                        shortcuts.Add(x.lnk + "~~" + a);
                     }
                 }
                 else
@@ -423,10 +454,10 @@ namespace Administration
             try
             {
                 file = new System.IO.StreamWriter(folderName + "\\packages.txt", true);
-                file.WriteLine("p"+ instType + " " + package);
+                file.WriteLine("p"+ instType + "~~" + package);
                 foreach (string sc in shortcuts)
                 {
-                    file.WriteLine("s " + sc);
+                    file.WriteLine("s~~" + sc);
                 }
                 file.Close();
             }
@@ -442,8 +473,12 @@ namespace Administration
             writeToKonzole("Registre diffnute" + Environment.NewLine);
             File.Delete(folderPath + "\\after.reg");
             File.Delete(folderPath + "\\before.reg");
-            button1.Enabled = true;
+            if (File.Exists(System.IO.Path.Combine(folderName, package + ".zip"))) File.Delete(System.IO.Path.Combine(folderName, package + ".zip"));
+            ZipFile.CreateFromDirectory(folderPath, System.IO.Path.Combine(folderName, package+".zip"));
             writeToKonzole(package + " zaznamenany" + Environment.NewLine);
+            textBox3.Enabled = true;
+            button1.Enabled = true;
+            this.Text = "Administration";
         }
     }
 }
