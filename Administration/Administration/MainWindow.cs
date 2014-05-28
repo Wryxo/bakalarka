@@ -34,7 +34,7 @@ namespace Administration
         string serverDir;
         string package;
         string instType;
-        string keyName = @"HKEY_LOCAL_MACHINE\SOFTWARE\SetItUp";
+        string keyNameHKLM = @"HKEY_LOCAL_MACHINE\SOFTWARE\SetItUp";
         // slova ktore sa nemozu vyskytnut v ceste k suboru alebo v nazve suboru    
         List<string> banned = new List<string>();
         List<string> shortcuts = new List<string>();
@@ -50,7 +50,7 @@ namespace Administration
                 return true;
             };*/
             try { 
-                folderName = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
+                folderName = (string)Registry.GetValue(keyNameHKLM, "packageDir", "Not Exist");
                 if (!Directory.Exists(folderName)) System.IO.Directory.CreateDirectory(folderName);
             }
             catch (Exception ex)
@@ -69,19 +69,29 @@ namespace Administration
             catch (Exception ex)
             {
                 MessageBox.Show("Nastala chyba pri nacitani zakazanych slov " + ex.Message);
-                return;
+                //return;
             }
             // stiahneme najnovsi zoznam balickov
+            if (File.Exists(folderName + "\\packages.txt")) File.Move(folderName + "\\packages.txt", folderName + "\\packages.bk");
             WebClient myWebClient = new WebClient();
             try  {
-                serverDir = (string)Registry.GetValue(keyName, "serverDir", "Not Exist");
+                serverDir = (string)Registry.GetValue(keyNameHKLM, "serverDir", "Not Exist");
                 myWebClient.DownloadFile(serverDir + "/packages.txt", folderName + "\\packages.txt");
                 packList = File.ReadAllLines(folderName + "\\packages.txt");
+                if (File.Exists(folderName + "\\packages.bk")) File.Delete(folderName + "\\packages.bk");
             } 
             catch (Exception ex) 
             {
                 MessageBox.Show("Nastala chyba pri stahovani zoznamu balickov " + ex.Message);
-                packList = new string[1];
+                if (File.Exists(folderName + "\\packages.bk"))
+                {
+                    File.Move(folderName + "\\packages.bk", folderName + "\\packages.txt");
+                    packList = File.ReadAllLines(folderName + "\\packages.txt");
+                }
+                else
+                {
+                    packList = new string[1];
+                }
             }
             finally
             {
@@ -93,10 +103,6 @@ namespace Administration
         [PermissionSet(SecurityAction.Demand, Name = "FullTrust")]
         public void startFileWatchers()
         {
-            package = textBox3.Text;
-            this.Text = "Administration - " + package;
-            folderPath = System.IO.Path.Combine(folderName, package);
-            System.IO.Directory.CreateDirectory(folderPath);
             DriveInfo[] allDrives = DriveInfo.GetDrives();
             // pre kazdy pevny disk spustime watchera
             foreach (DriveInfo d in allDrives)
@@ -249,7 +255,7 @@ namespace Administration
             {
                 proc.StartInfo.FileName = "regedit.exe";
                 proc.StartInfo.UseShellExecute = false;
-                proc = Process.Start("regedit.exe", path + "");
+                proc = Process.Start("regedit.exe ", path + "");
 
                 if (proc != null) proc.WaitForExit();
             }
@@ -299,6 +305,34 @@ namespace Administration
                             }
                         }
                         break;
+                    case DiffResultSpanStatus.Replace:
+                        for (i = 0; i < drs.Length; i++)
+                        {
+                            tmp = ((TextLine)destination.GetByIndex(drs.DestIndex + i)).Line.ToString();
+                            if (tmp != "")
+                            {
+                                if (tmp.StartsWith("[HKEY_"))
+                                {
+                                    lastKey = tmp;
+                                }
+                                else if (tmp.StartsWith("\"") || tmp.StartsWith("@"))
+                                {
+                                    res.Add(lastKey);
+                                    res.Add(tmp);
+                                    res.Add("");
+                                    /*j++;
+                                    res[j] = lastKey;
+                                    j++;
+                                    res[j] = tmp;
+                                    j++;*/
+                                }
+                                else
+                                {
+                                    res.Add(tmp);
+                                }
+                            }
+                        }
+                        break;
                     case DiffResultSpanStatus.NoChange:
                         for (i = 0; i < drs.Length; i++)
                         {
@@ -308,7 +342,7 @@ namespace Administration
                         break;
                 }
             }
-            if (j == 1) return null;
+            if (res.Count == 1) return null;
             return res.ToArray();
         }
 
@@ -334,7 +368,12 @@ namespace Administration
                 time = de.ProcessDiff(sLF, dLF, DiffEngineLevel.FastImperfect);
                 ArrayList rep = de.DiffReport();
                 string[] res = getResults(dLF, rep);
-                if (res != null) File.WriteAllLines(folderPath + "\\" + package + ".reg", res);
+                if (res != null)
+                {
+                    string[] filesplit = dFile.Split('\\');
+                    string filename = filesplit.Last();
+                    File.WriteAllLines(folderPath + "\\SetItUp_Registry\\" + filename, res);
+                }
             }
             catch (Exception ex)
             {
@@ -358,13 +397,20 @@ namespace Administration
         {
             changes.Clear();
             shortcuts.Clear();
+            exes.Clear();
             button1.Enabled = false;
             textBox3.Enabled = false;
+            package = textBox3.Text;
+            this.Text = "Administration - " + package;
+            folderPath = System.IO.Path.Combine(folderName, package);
+            System.IO.Directory.CreateDirectory(folderPath);
             try 
             { 
-                startFileWatchers();
-                ExportKey("HKEY_LOCAL_MACHINE\\SOFTWARE", folderPath + "\\before.reg");
+                //ExportKey("HKEY_LOCAL_MACHINE\\SOFTWARE", folderPath + "\\before.reg");
+                ExportKeys("Before");
                 writeToKonzole("Registre exportnute" + Environment.NewLine);
+                startFileWatchers();
+                writeToKonzole("Pocuvanie spustene" + Environment.NewLine);
             }
             catch (Exception ex)
             {
@@ -466,19 +512,64 @@ namespace Administration
                 MessageBox.Show("Nastala chyba v zapise do zoznamu balickov");
             }
             // spravime rozdiel registrov a vymazeme docasne subory
-            writeToKonzole("Subory odkopirovane" + Environment.NewLine);
-            ExportKey("HKEY_LOCAL_MACHINE\\SOFTWARE", folderPath + "\\after.reg");
-            writeToKonzole("Registre exportnute" + Environment.NewLine);
-            TextDiff(folderPath + "\\before.reg", folderPath + "\\after.reg");
-            writeToKonzole("Registre diffnute" + Environment.NewLine);
-            File.Delete(folderPath + "\\after.reg");
-            File.Delete(folderPath + "\\before.reg");
+            Task.Run( () =>writeToKonzole("Subory odkopirovane" + Environment.NewLine));
+            //ExportKey("HKEY_LOCAL_MACHINE\\SOFTWARE", folderPath + "\\after.reg");
+            ExportKeys("After");
+           Task.Run(() => writeToKonzole("Registre exportnute" + Environment.NewLine));
+            //TextDiff(folderPath + "\\before.reg", folderPath + "\\after.reg");
+            if (!Directory.Exists(folderPath + "\\SetItUp_Registry")) Directory.CreateDirectory(folderPath + "\\SetItUp_Registry");
+            SpravDiff();
+            Task.Run(() => writeToKonzole("Registre diffnute" + Environment.NewLine));
+            //File.Delete(folderPath + "\\after.reg");
+            //File.Delete(folderPath + "\\before.reg");
+            if (Directory.Exists(folderPath + "\\After")) Directory.Delete(folderPath + "\\After", true);
+            if (Directory.Exists(folderPath + "\\Before")) Directory.Delete(folderPath + "\\Before", true);
             if (File.Exists(System.IO.Path.Combine(folderName, package + ".zip"))) File.Delete(System.IO.Path.Combine(folderName, package + ".zip"));
             ZipFile.CreateFromDirectory(folderPath, System.IO.Path.Combine(folderName, package+".zip"));
             writeToKonzole(package + " zaznamenany" + Environment.NewLine);
             textBox3.Enabled = true;
             button1.Enabled = true;
             this.Text = "Administration";
+        }
+
+        private void SpravDiff()
+        {
+            string[] files = Directory.GetFiles(folderPath + "\\After");
+            //Task.Run( () =>writeToKonzole("Nacitany zoznam " + files.Length + Environment.NewLine));
+            foreach (string path in files)
+            {
+                string[] contents = path.Split('\\');
+                string filename = contents.Last();
+                //Task.Run(() => writeToKonzole("Spracovavam " + filename + Environment.NewLine));
+                if (File.Exists(folderPath + "\\Before\\" + filename))
+                {
+                    //Task.Run(() => writeToKonzole("Diffujem " + filename + " s " + path + Environment.NewLine));
+                    TextDiff(folderPath + "\\Before\\" + filename, path);
+                }
+                else
+                {
+                    //Task.Run(() => writeToKonzole("Kopirujem " + filename + Environment.NewLine));
+                    File.Copy(path, folderPath + "\\SetItUp_Registry\\" + filename);
+                }
+            }
+        }
+
+        private void ExportKeys(string p)
+        {
+            RegistryKey keyHKLM = Registry.LocalMachine.CreateSubKey("SOFTWARE");
+            RegistryKey keyHKCU = Registry.CurrentUser.CreateSubKey("Software");
+            string hklm = @"HKEY_LOCAL_MACHINE\SOFTWARE\";
+            string hkcu = @"HKEY_CURRENT_USER\Software\";
+            string folder = folderPath + "\\" + p;
+            if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
+            foreach (string name in keyHKLM.GetSubKeyNames())
+            {
+                ExportKey(hklm + name,  folder + "\\hklm_" + name + ".reg");
+            }
+            foreach (string name in keyHKCU.GetSubKeyNames())
+            {
+                ExportKey(hkcu + name, folder + "\\hkcu_" + name + ".reg");
+            }
         }
     }
 }

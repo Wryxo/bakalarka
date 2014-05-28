@@ -55,18 +55,24 @@ namespace UserApp
             string installDir;
             if (args.Length > 0)
             {
-                installDir = (string)Registry.GetValue(keyName, "installDir", "Not Exist");
-                package = args[0];
-                // zapis balik ktory treba nainstalovat
-                File.WriteAllText(installDir + "Last.txt", package);
-                // zavolaj sluzbu a povedz je ze treba nainstalovat balik
-                ServiceController sc = new ServiceController("SetItUpService");
-                sc.ExecuteCommand(SERVICE_INSTALL_PACKAGE);
-                WaitForService(installDir);
-                    // ked sluzba nainstaluje balik a do parametru sme dostali .exe programu, tak ho spustime
                 if (args.Length > 1)
                 {
                     executable = args[1];
+                }
+                if (args.Length < 2 || !File.Exists(executable)) { 
+                    installDir = (string)Registry.GetValue(keyName, "installDir", "Not Exist");
+                    package = args[0];
+                    // zapis balik ktory treba nainstalovat
+                    File.WriteAllText(installDir + "Last.txt", package);
+                    // zavolaj sluzbu a povedz je ze treba nainstalovat balik
+                    ServiceController sc = new ServiceController("SetItUpService");
+                    sc.ExecuteCommand(SERVICE_INSTALL_PACKAGE);
+                    WaitForService(installDir);
+                }
+                    // ked sluzba nainstaluje balik a do parametru sme dostali .exe programu, tak ho spustime
+                if (args.Length > 1)
+                {
+                    //executable = args[1];
                     var handle = GetConsoleWindow();
                     // Hide
                     ShowWindow(handle, SW_HIDE);
@@ -164,6 +170,7 @@ namespace UserApp
             string ready = "";
             while (ready != "done")
             {
+                Console.WriteLine("check " + DateTime.Now);
                 ready = File.ReadAllText(installDir + "Last.txt");
                 Thread.Sleep(1000);
             }

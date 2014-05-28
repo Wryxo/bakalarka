@@ -44,7 +44,8 @@ namespace SetItUpService
             string installDir = (string)Registry.GetValue(keyName, "installDir", "Not Exist");
             string packageDir = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
             string shortcutDir = (string)Registry.GetValue(keyName, "shortcutDir", "Not Exist");
-            /*try
+            //*
+            try
             {
                 ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, policy) =>
                 {
@@ -54,7 +55,7 @@ namespace SetItUpService
             catch (Exception ex)
             {
                 eventLog1.WriteEntry(ex.Message);
-            }*/
+            }//*/
             WebClient myWebClient = new WebClient();
             try
             {
@@ -103,8 +104,8 @@ namespace SetItUpService
                     IWshRuntimeLibrary.IWshShortcut shortcut = 
                         wsh.CreateShortcut(shortcutDir + "\\" + tmp[1] + ".lnk")
                         as IWshRuntimeLibrary.IWshShortcut;
-                    shortcut.Arguments = package + " \"" + tmp[2] + "\"";
-                    shortcut.TargetPath = installDir + "UserApp.exe";
+                    shortcut.Arguments = " \"" + package +  "\" \"" + tmp[2] + "\"";
+                    shortcut.TargetPath = System.IO.Path.Combine(installDir, "UserApp.exe");
                     shortcut.Save();
                 }
             }
@@ -158,7 +159,7 @@ namespace SetItUpService
                     try
                     {
                         string serverDir = (string)Registry.GetValue(keyName, "serverDir", "Not Exist"); 
-                        myWebClient.DownloadFile(serverDir + package + ".zip", folderName + "\\" + package + ".zip");
+                        myWebClient.DownloadFile(serverDir + "/" + package + ".zip", folderName + "\\" + package + ".zip");
                     }
                     catch (Exception ex)
                     {
@@ -187,8 +188,8 @@ namespace SetItUpService
                     string[] lines = System.IO.File.ReadAllLines(System.IO.Path.Combine(folderPath, package + ".txt"));
                     foreach (string line in lines)
                     {
-                        if (!File.Exists(line))
-                        {
+                        //if (!File.Exists(line))
+                        //{
                             string newPath = line.Substring(3);
                             if (File.Exists(System.IO.Path.Combine(folderPath, newPath)))
                             {
@@ -203,14 +204,18 @@ namespace SetItUpService
                                 catch (Exception ex)
                                 {
                                     eventLog1.WriteEntry("Nastala chyba pri kopirovani suboru " + ex.Message);
-                                    return;
                                 }
                             }
-                        }
+                        //}
                     }
                     eventLog1.WriteEntry("Importujem registry");
-                    string filePath = System.IO.Path.Combine(folderPath, package + ".reg");
-                    if (File.Exists(filePath)) ImportKey(filePath);
+                    //string filePath = System.IO.Path.Combine(folderPath, package + ".reg");
+                    //if (File.Exists(filePath)) ImportKey(filePath);
+                    string[] registryFiles = Directory.GetFiles(folderPath + " \\SetItUp_Registry", "hklm*");
+                    foreach(string filePath in registryFiles)
+                    {
+                        ImportKey(filePath);
+                    }
                 }
                 else
                 {
@@ -225,25 +230,27 @@ namespace SetItUpService
                 {
                     eventLog1.WriteEntry("Chyba pri citani depedencies " + ex.Message);
                 }
-                
                 if (Directory.Exists(folderPath)) Directory.Delete(folderPath, true);
+                File.WriteAllText(installDir + "Last.txt", "done");
                 eventLog1.WriteEntry("Instalacia baliku " + package + " dokoncena");
             }
-            File.WriteAllText(installDir + "Last.txt", "done");
+            
         }
 
-        public static void ImportKey(string SavePath)
+        public void ImportKey(string SavePath)
         {
             string path = "\"" + SavePath + "\"";
+            eventLog1.WriteEntry("Importujem reg file " + SavePath);
 
             var proc = new Process();
             try
             {
-                proc.StartInfo.FileName = "regedit.exe";
-                proc.StartInfo.UseShellExecute = false;
-                proc = Process.Start("regedit.exe", path + "");
-
+                eventLog1.WriteEntry("spustam regedit " + SavePath);
+                //proc.StartInfo.FileName = "regedit.exe";
+                //proc.StartInfo.UseShellExecute = false;
+                proc = Process.Start("regedit.exe", "/s " + path);
                 if (proc != null) proc.WaitForExit();
+                eventLog1.WriteEntry("regedit skoncil");
             }
             finally
             {
