@@ -44,7 +44,7 @@ namespace SetItUpService
             string installDir = (string)Registry.GetValue(keyName, "installDir", "Not Exist");
             string packageDir = (string)Registry.GetValue(keyName, "packageDir", "Not Exist");
             string shortcutDir = (string)Registry.GetValue(keyName, "shortcutDir", "Not Exist");
-            //*
+            /*
             try
             {
                 ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, policy) =>
@@ -129,6 +129,7 @@ namespace SetItUpService
             if (folderName == "Not Exist")
             {
                 eventLog1.WriteEntry("Nenasiel som zlozku pre balicky" + Environment.NewLine);
+                File.WriteAllText(installDir + "Last.txt", "Nastala chyba. Vypis chyby zapisany v event logu. Kontaktujte administratora.");
                 return;
             }
             if (!Directory.Exists(folderName))
@@ -164,6 +165,7 @@ namespace SetItUpService
                     catch (Exception ex)
                     {
                         eventLog1.WriteEntry("Nastala chyba pri stahovani balicka " + ex.Message);
+                        File.WriteAllText(installDir + "Last.txt", "Nastala chyba. Vypis chyby zapisany v event logu. Kontaktujte administratora.");
                         return;
                     }
                     finally
@@ -180,6 +182,7 @@ namespace SetItUpService
                 catch (Exception ex)
                 {
                     eventLog1.WriteEntry("Nastala chyba pri rozbaleni archivu " + ex.Message);
+                    File.WriteAllText(installDir + "Last.txt", "Nastala chyba. Vypis chyby zapisany v event logu. Kontaktujte administratora.");
                     return;
                 }
                 
@@ -199,7 +202,7 @@ namespace SetItUpService
                                 }
                                 try
                                 {
-                                    System.IO.File.Copy(System.IO.Path.Combine(folderPath, newPath), line, true);
+                                    if (!line.Contains("[[]]")) System.IO.File.Copy(System.IO.Path.Combine(folderPath, newPath), line, true);
                                 }
                                 catch (Exception ex)
                                 {
@@ -220,6 +223,8 @@ namespace SetItUpService
                 else
                 {
                     eventLog1.WriteEntry("Nenasiel som instalaciu pre " + package);
+                    File.WriteAllText(installDir + "Last.txt", "Nastala chyba. Vypis chyby zapisany v event logu. Kontaktujte administratora.");
+                    return;
                 }
                 eventLog1.WriteEntry("Pridavam potrebne baliky do fronty");
                 try { 

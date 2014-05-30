@@ -53,6 +53,7 @@ namespace UserApp
              * Zisti ci treba obnovit shortcuty alebo nainstalovat balik
              */
             string installDir;
+            bool error = false;
             if (args.Length > 0)
             {
                 if (args.Length > 1)
@@ -67,10 +68,10 @@ namespace UserApp
                     // zavolaj sluzbu a povedz je ze treba nainstalovat balik
                     ServiceController sc = new ServiceController("SetItUpService");
                     sc.ExecuteCommand(SERVICE_INSTALL_PACKAGE);
-                    WaitForService(installDir);
+                    error = WaitForService(installDir);
                 }
                     // ked sluzba nainstaluje balik a do parametru sme dostali .exe programu, tak ho spustime
-                if (args.Length > 1)
+                if (args.Length > 1 && !error)
                 {
                     //executable = args[1];
                     var handle = GetConsoleWindow();
@@ -87,7 +88,7 @@ namespace UserApp
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine("Nastala chyba pri spusteni programu " + ex.Message + Environment.NewLine);
+                            Console.WriteLine("Nastala chyba pri spusteni programu " + ex.Message);
                             Console.ReadKey();
                             return;
                         }
@@ -100,7 +101,7 @@ namespace UserApp
                 }
                 else
                 {
-                    Console.WriteLine("Nenasiel som instalaciu pre " + package + Environment.NewLine);
+                    Console.WriteLine("Nepodarilo sa nainstalovat " + package);
                     Console.ReadKey();
                 }
             }
@@ -164,16 +165,28 @@ namespace UserApp
             }
         }
 
-        private static void WaitForService(string installDir)
+        private static bool WaitForService(string installDir)
         {
-            Console.WriteLine("Instalujem balik");
-            string ready = "";
-            while (ready != "done")
+            Console.WriteLine("Instalujem balik " + package);
+            string ready = package;
+            while (ready == package)
             {
-                Console.WriteLine("check " + DateTime.Now);
-                ready = File.ReadAllText(installDir + "Last.txt");
+                Console.Write(".");
+                try { 
+                    ready = File.ReadAllText(installDir + "Last.txt");
+                }
+                catch
+                {
+                    ready = package;
+                }
                 Thread.Sleep(1000);
             }
+            if (ready.Equals("done")) return false;
+            Console.WriteLine();
+            Console.WriteLine(ready);
+            Console.WriteLine("Pokracujte stlacenim klavesy...");
+            Console.ReadKey();
+            return true;
         }
     }
 }

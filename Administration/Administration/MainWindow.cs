@@ -203,18 +203,22 @@ namespace Administration
                     }
                         // ak je dany subor spustitelny, opytame sa ci nan treba spravit odkaz
                     if (line.Contains(".exe") || line.Contains(".EXE"))
-                        {
-                            string[] words = line.Split('\\');
-                            if (!exes.ContainsKey(words[words.Length - 1])) exes.Add(words[words.Length - 1], line);
-                        }
-                        try
-                        {
-                            System.IO.File.Copy(line, System.IO.Path.Combine(folderPath, newPath), true);
-                        }
-                        catch (Exception ex)
-                        {
-                            MessageBox.Show("Nepodarilo sa odkopirovat subor " + ex.Message);
-                        }
+                    {
+                        string[] words = line.Split('\\');
+                        if (!exes.ContainsKey(words[words.Length - 1])) exes.Add(words[words.Length - 1], line);
+                    }
+                    /*if (line.Contains(Environment.UserName))
+                    {
+                        line.Replace(Environment.UserName, "[[]]");
+                    }*/
+                    try
+                    {
+                        System.IO.File.Copy(line, System.IO.Path.Combine(folderPath, newPath), true);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Nepodarilo sa odkopirovat subor " + ex.Message);
+                    }
                 }
             }
         }
@@ -268,7 +272,7 @@ namespace Administration
 
         private string[] getResults(DiffList_TextFile destination, ArrayList DiffLines)
         {
-            int i, j=1;
+            int i=1;
             //string[] res = new string[5000];
             List<string> res = new List<string>();
             string lastKey = "";
@@ -557,19 +561,19 @@ namespace Administration
         private void ExportKeys(string p)
         {
             RegistryKey keyHKLM = Registry.LocalMachine.CreateSubKey("SOFTWARE");
-            RegistryKey keyHKCU = Registry.CurrentUser.CreateSubKey("Software");
+            //RegistryKey keyHKCU = Registry.CurrentUser.CreateSubKey("Software");
             string hklm = @"HKEY_LOCAL_MACHINE\SOFTWARE\";
-            string hkcu = @"HKEY_CURRENT_USER\Software\";
+            //string hkcu = @"HKEY_CURRENT_USER\Software\";
             string folder = folderPath + "\\" + p;
             if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
             foreach (string name in keyHKLM.GetSubKeyNames())
             {
                 ExportKey(hklm + name,  folder + "\\hklm_" + name + ".reg");
             }
-            foreach (string name in keyHKCU.GetSubKeyNames())
+            /*foreach (string name in keyHKCU.GetSubKeyNames())
             {
                 ExportKey(hkcu + name, folder + "\\hkcu_" + name + ".reg");
-            }
+            }*/
         }
     }
 }
